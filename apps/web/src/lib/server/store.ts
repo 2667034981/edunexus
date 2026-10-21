@@ -131,6 +131,10 @@ function getDbFilePath() {
   if (process.env.EDUNEXUS_DATA_DIR) {
     return path.join(process.env.EDUNEXUS_DATA_DIR, "db.json");
   }
+  // Vercel 等无服务器环境磁盘只读，写入临时目录
+  if (process.env.VERCEL) {
+    return path.join("/tmp", "edunexus", "db.json");
+  }
   const root = findProjectRootSync();
   return path.join(root, ".edunexus", "data", "db.json");
 }
