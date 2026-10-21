@@ -1,0 +1,82 @@
+{
+  "name": "EduNexus - AI 教育生态平台",
+  "short_name": "EduNexus",
+  "description": "以知识建构为核心的 Web-only AI 教育平台",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "知识库",
+      "short_name": "知识库",
+      "description": "快速访问知识库",
+      "url": "/kb",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "工作空间",
+      "short_name": "工作空间",
+      "description": "快速访问工作空间",
+      "url": "/workspace",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "练习",
+      "short_name": "练习",
+      "description": "快速访问练习系统",
+      "url": "/workspace/practice",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "分析",
+      "short_name": "分析",
+      "description": "快速访问学习分析",
+      "url": "/workspace/analytics",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ],
+  "share_target": {
+    "action": "/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "file",
+          "accept": ["text/*", "application/pdf", "image/*"]
+        }
+      ]
+    }
+  },
+  "categories": ["education", "productivity"],
+  "screenshots": [
+    {
+      "src": "/screenshots/desktop-1.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/screenshots/mobile-1.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ]
+}
