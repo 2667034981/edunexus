@@ -1,0 +1,837 @@
+/* 移动端专属样式 - 完整优化版 */
+
+/* ==================== 安全区域适配 ==================== */
+@supports (padding: env(safe-area-inset-top)) {
+  :root {
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
+  }
+
+  .safe-area-top {
+    padding-top: var(--safe-area-inset-top);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: var(--safe-area-inset-bottom);
+  }
+
+  .safe-area-left {
+    padding-left: var(--safe-area-inset-left);
+  }
+
+  .safe-area-right {
+    padding-right: var(--safe-area-inset-right);
+  }
+
+  .safe-area-inset {
+    padding-top: var(--safe-area-inset-top);
+    padding-bottom: var(--safe-area-inset-bottom);
+    padding-left: var(--safe-area-inset-left);
+    padding-right: var(--safe-area-inset-right);
+  }
+}
+
+/* 触摸目标最小尺寸 (44x44px) */
+@media (max-width: 768px) {
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* 移动端按钮增强 */
+  button,
+  a,
+  [role="button"] {
+    min-height: 44px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* 禁用文本选择（在某些交互元素上） */
+  .no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+
+  /* 移动端输入框优化 */
+  input,
+  textarea,
+  select {
+    font-size: 16px; /* 防止 iOS 自动缩放 */
+  }
+
+  /* 移动端卡片布局 */
+  .mobile-card {
+    @apply rounded-xl p-4 shadow-sm;
+  }
+
+  /* 移动端列表项 */
+  .mobile-list-item {
+    @apply flex items-center gap-3 p-4 active:bg-accent transition-colors;
+  }
+
+  /* 移动端底部导航栏占位 */
+  .mobile-bottom-padding {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+
+  /* 移动端顶部栏占位 */
+  .mobile-top-padding {
+    padding-top: calc(56px + env(safe-area-inset-top));
+  }
+
+  /* 移动端全屏容器 */
+  .mobile-fullscreen {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+
+  /* 移动端滚动容器 */
+  .mobile-scroll-container {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* 移动端网格布局 */
+  .mobile-grid {
+    @apply grid grid-cols-1 gap-4;
+  }
+
+  .mobile-grid-2 {
+    @apply grid grid-cols-2 gap-3;
+  }
+
+  /* 移动端文本大小 */
+  .mobile-text-xs {
+    @apply text-xs;
+  }
+
+  .mobile-text-sm {
+    @apply text-sm;
+  }
+
+  .mobile-text-base {
+    @apply text-base;
+  }
+
+  .mobile-text-lg {
+    @apply text-lg;
+  }
+
+  /* 移动端间距 */
+  .mobile-spacing {
+    @apply space-y-4;
+  }
+
+  .mobile-spacing-sm {
+    @apply space-y-2;
+  }
+
+  .mobile-spacing-lg {
+    @apply space-y-6;
+  }
+
+  /* 移动端隐藏桌面元素 */
+  .desktop-only {
+    @apply hidden;
+  }
+
+  /* 移动端显示 */
+  .mobile-only {
+    @apply block;
+  }
+}
+
+/* 平板端样式 */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .tablet-grid {
+    @apply grid grid-cols-2 gap-4;
+  }
+
+  .tablet-grid-3 {
+    @apply grid grid-cols-3 gap-4;
+  }
+}
+
+/* 桌面端隐藏移动元素 */
+@media (min-width: 769px) {
+  .mobile-only {
+    @apply hidden;
+  }
+
+  .desktop-only {
+    @apply block;
+  }
+}
+
+/* 横屏模式优化 */
+@media (max-width: 768px) and (orientation: landscape) {
+  .landscape-compact {
+    @apply py-2;
+  }
+
+  .landscape-hide {
+    @apply hidden;
+  }
+
+  /* 横屏时减少垂直间距 */
+  .landscape-spacing {
+    @apply space-y-2;
+  }
+}
+
+/* 触摸反馈动画 */
+@media (max-width: 768px) {
+  .touch-feedback {
+    transition: transform 0.1s ease, background-color 0.1s ease;
+  }
+
+  .touch-feedback:active {
+    transform: scale(0.98);
+    @apply bg-accent;
+  }
+}
+
+/* 移动端模态框 */
+@media (max-width: 768px) {
+  .mobile-modal {
+    @apply fixed inset-0 z-50 bg-white dark:bg-gray-900;
+    animation: slideUp 0.3s ease-out;
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+}
+
+/* 移动端抽屉 */
+@media (max-width: 768px) {
+  .mobile-drawer {
+    @apply fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl;
+    max-height: 90vh;
+    animation: slideUpDrawer 0.3s ease-out;
+  }
+
+  @keyframes slideUpDrawer {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+}
+
+/* 移动端图片优化 */
+@media (max-width: 768px) {
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .mobile-image-grid {
+    @apply grid grid-cols-2 gap-2;
+  }
+
+  .mobile-image-grid img {
+    @apply rounded-lg object-cover aspect-square;
+  }
+}
+
+/* 移动端表格优化 */
+@media (max-width: 768px) {
+  .mobile-table {
+    @apply block overflow-x-auto;
+  }
+
+  .mobile-table table {
+    @apply min-w-full;
+  }
+
+  /* 卡片式表格 */
+  .mobile-table-card {
+    @apply block;
+  }
+
+  .mobile-table-card thead {
+    @apply hidden;
+  }
+
+  .mobile-table-card tr {
+    @apply block mb-4 border border-border rounded-lg p-4;
+  }
+
+  .mobile-table-card td {
+    @apply block text-right;
+  }
+
+  .mobile-table-card td::before {
+    content: attr(data-label);
+    @apply float-left font-semibold;
+  }
+}
+
+/* 移动端代码块优化 */
+@media (max-width: 768px) {
+  pre {
+    @apply text-xs overflow-x-auto;
+  }
+
+  code {
+    @apply text-xs;
+  }
+}
+
+/* 移动端虚拟键盘适配 */
+@media (max-width: 768px) {
+  .keyboard-aware {
+    transition: transform 0.3s ease;
+  }
+
+  /* 当虚拟键盘弹出时 */
+  .keyboard-open .keyboard-aware {
+    transform: translateY(-50%);
+  }
+}
+
+/* 移动端性能优化 */
+@media (max-width: 768px) {
+  /* 使用 GPU 加速 */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform;
+  }
+
+  /* 减少动画复杂度 */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* ==================== 增强的移动端优化 ==================== */
+
+/* 移动端下拉刷新 */
+@media (max-width: 768px) {
+  .pull-to-refresh {
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pull-to-refresh-indicator {
+    @apply absolute top-0 left-0 right-0 flex items-center justify-center py-4 bg-background/80 backdrop-blur-sm;
+    transform: translateY(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  .pull-to-refresh.pulling .pull-to-refresh-indicator {
+    transform: translateY(0);
+  }
+}
+
+/* 移动端手势优化 */
+@media (max-width: 768px) {
+  .swipeable {
+    touch-action: pan-y;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .swipeable-horizontal {
+    touch-action: pan-x;
+  }
+
+  .swipeable-vertical {
+    touch-action: pan-y;
+  }
+}
+
+/* 移动端卡片堆叠 */
+@media (max-width: 768px) {
+  .mobile-stack {
+    @apply space-y-3;
+  }
+
+  .mobile-stack > * {
+    @apply w-full;
+  }
+}
+
+/* 移动端固定头部 */
+@media (max-width: 768px) {
+  .mobile-sticky-header {
+    @apply sticky top-0 z-40 bg-background/95 backdrop-blur-lg border-b;
+    padding-top: var(--safe-area-inset-top);
+  }
+}
+
+/* 移动端底部操作栏 */
+@media (max-width: 768px) {
+  .mobile-bottom-bar {
+    @apply fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-lg border-t shadow-lg;
+    padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem);
+  }
+}
+
+/* 移动端优化的输入框 */
+@media (max-width: 768px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  textarea,
+  select {
+    font-size: 16px !important; /* 防止 iOS 自动缩放 */
+    @apply min-h-[44px]; /* 确保触摸目标足够大 */
+  }
+
+  /* 搜索框优化 */
+  input[type="search"] {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  input[type="search"]::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+}
+
+/* 移动端优化的按钮 */
+@media (max-width: 768px) {
+  button,
+  [role="button"],
+  .btn {
+    @apply min-h-[44px] min-w-[44px]; /* Apple HIG 推荐的最小触摸目标 */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* 按钮按下效果 */
+  button:active,
+  [role="button"]:active {
+    transform: scale(0.97);
+    transition: transform 0.1s ease;
+  }
+}
+
+/* 移动端优化的链接 */
+@media (max-width: 768px) {
+  a {
+    -webkit-tap-highlight-color: transparent;
+    @apply min-h-[44px] inline-flex items-center;
+  }
+}
+
+/* 移动端优化的列表 */
+@media (max-width: 768px) {
+  .mobile-list {
+    @apply divide-y divide-border;
+  }
+
+  .mobile-list-item {
+    @apply flex items-center gap-3 p-4 min-h-[60px] active:bg-accent/50 transition-colors;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-list-item-compact {
+    @apply flex items-center gap-2 p-3 min-h-[48px];
+  }
+}
+
+/* 移动端优化的对话框 */
+@media (max-width: 768px) {
+  .mobile-dialog {
+    @apply fixed inset-x-0 bottom-0 z-50 rounded-t-2xl;
+    max-height: 90vh;
+    animation: slideUpDialog 0.3s ease-out;
+  }
+
+  @keyframes slideUpDialog {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  .mobile-dialog-overlay {
+    @apply fixed inset-0 z-40 bg-black/50 backdrop-blur-sm;
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+/* 移动端优化的标签页 */
+@media (max-width: 768px) {
+  .mobile-tabs {
+    @apply flex overflow-x-auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .mobile-tab {
+    @apply flex-shrink-0 px-4 py-3 min-w-[100px] text-center;
+    scroll-snap-align: start;
+  }
+}
+
+/* 移动端优化的卡片 */
+@media (max-width: 768px) {
+  .mobile-card {
+    @apply rounded-xl p-4 shadow-sm bg-card border border-border;
+  }
+
+  .mobile-card-compact {
+    @apply rounded-lg p-3 shadow-sm bg-card;
+  }
+
+  .mobile-card-interactive {
+    @apply mobile-card active:scale-[0.98] transition-transform;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* 移动端优化的网格 */
+@media (max-width: 768px) {
+  .mobile-grid-auto {
+    @apply grid gap-3;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+
+  .mobile-grid-2 {
+    @apply grid grid-cols-2 gap-3;
+  }
+
+  .mobile-grid-3 {
+    @apply grid grid-cols-3 gap-2;
+  }
+}
+
+/* 移动端优化的间距 */
+@media (max-width: 768px) {
+  .mobile-container {
+    @apply px-4 py-4;
+  }
+
+  .mobile-section {
+    @apply space-y-4 mb-6;
+  }
+
+  .mobile-section-compact {
+    @apply space-y-2 mb-4;
+  }
+}
+
+/* 移动端优化的文本 */
+@media (max-width: 768px) {
+  .mobile-title {
+    @apply text-xl font-semibold;
+  }
+
+  .mobile-subtitle {
+    @apply text-base font-medium;
+  }
+
+  .mobile-body {
+    @apply text-sm;
+  }
+
+  .mobile-caption {
+    @apply text-xs text-muted-foreground;
+  }
+}
+
+/* 移动端优化的图片 */
+@media (max-width: 768px) {
+  .mobile-image {
+    @apply w-full h-auto rounded-lg;
+  }
+
+  .mobile-image-cover {
+    @apply w-full h-48 object-cover rounded-lg;
+  }
+
+  .mobile-avatar {
+    @apply w-10 h-10 rounded-full;
+  }
+
+  .mobile-avatar-sm {
+    @apply w-8 h-8 rounded-full;
+  }
+
+  .mobile-avatar-lg {
+    @apply w-16 h-16 rounded-full;
+  }
+}
+
+/* 移动端优化的加载状态 */
+@media (max-width: 768px) {
+  .mobile-skeleton {
+    @apply animate-pulse bg-muted rounded;
+  }
+
+  .mobile-spinner {
+    @apply animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full;
+  }
+}
+
+/* 移动端优化的通知 */
+@media (max-width: 768px) {
+  .mobile-toast {
+    @apply fixed bottom-20 left-4 right-4 z-50 p-4 rounded-xl shadow-lg bg-card border border-border;
+    animation: slideUpToast 0.3s ease-out;
+  }
+
+  @keyframes slideUpToast {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+}
+
+/* 移动端优化的徽章 */
+@media (max-width: 768px) {
+  .mobile-badge {
+    @apply inline-flex items-center px-2 py-1 rounded-full text-xs font-medium;
+  }
+
+  .mobile-badge-dot {
+    @apply w-2 h-2 rounded-full;
+  }
+}
+
+/* 移动端优化的分隔线 */
+@media (max-width: 768px) {
+  .mobile-divider {
+    @apply h-px bg-border my-4;
+  }
+
+  .mobile-divider-text {
+    @apply flex items-center gap-2 text-xs text-muted-foreground my-4;
+  }
+
+  .mobile-divider-text::before,
+  .mobile-divider-text::after {
+    content: "";
+    @apply flex-1 h-px bg-border;
+  }
+}
+
+/* ==================== 平板端优化 ==================== */
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .tablet-grid-2 {
+    @apply grid grid-cols-2 gap-4;
+  }
+
+  .tablet-grid-3 {
+    @apply grid grid-cols-3 gap-4;
+  }
+
+  .tablet-container {
+    @apply px-6 py-6;
+  }
+
+  /* 平板端侧边栏 */
+  .tablet-sidebar {
+    @apply w-64;
+  }
+
+  /* 平板端卡片 */
+  .tablet-card {
+    @apply p-5;
+  }
+}
+
+/* ==================== 大屏优化 ==================== */
+
+@media (min-width: 1440px) {
+  .desktop-large-container {
+    @apply max-w-[1600px] mx-auto px-8;
+  }
+
+  .desktop-large-grid {
+    @apply grid grid-cols-12 gap-6;
+  }
+
+  /* 大屏卡片 */
+  .desktop-large-card {
+    @apply p-8 rounded-2xl;
+  }
+}
+
+/* ==================== 横屏模式优化 ==================== */
+
+@media (max-width: 768px) and (orientation: landscape) {
+  .landscape-compact {
+    @apply py-2;
+  }
+
+  .landscape-hide {
+    @apply hidden;
+  }
+
+  .landscape-spacing {
+    @apply space-y-2;
+  }
+
+  /* 横屏时减少头部高度 */
+  .landscape-header {
+    @apply h-12;
+  }
+
+  /* 横屏时优化导航 */
+  .landscape-nav {
+    @apply h-12;
+  }
+
+  /* 横屏时优化内容区域 */
+  .landscape-content {
+    @apply py-2;
+  }
+}
+
+/* ==================== 触摸反馈 ==================== */
+
+@media (max-width: 768px) {
+  .touch-feedback {
+    transition: transform 0.1s ease, background-color 0.1s ease;
+  }
+
+  .touch-feedback:active {
+    transform: scale(0.98);
+    @apply bg-accent/50;
+  }
+
+  .touch-feedback-subtle:active {
+    @apply opacity-70;
+  }
+}
+
+/* ==================== 可见性工具类 ==================== */
+
+/* 移动端隐藏 */
+@media (max-width: 768px) {
+  .desktop-only {
+    @apply hidden;
+  }
+
+  .mobile-only {
+    @apply block;
+  }
+}
+
+/* 桌面端隐藏 */
+@media (min-width: 769px) {
+  .mobile-only {
+    @apply hidden;
+  }
+
+  .desktop-only {
+    @apply block;
+  }
+}
+
+/* 平板端可见 */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .tablet-only {
+    @apply block;
+  }
+}
+
+@media (max-width: 768px), (min-width: 1025px) {
+  .tablet-only {
+    @apply hidden;
+  }
+}
+
+/* ==================== 性能优化 ==================== */
+
+/* 减少动画 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* GPU 加速 */
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+.gpu-accelerate {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* ==================== 辅助功能优化 ==================== */
+
+/* 焦点可见性 */
+@media (max-width: 768px) {
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-primary;
+  }
+
+  /* 跳过导航链接 */
+  .skip-to-content {
+    @apply sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg;
+  }
+}
+
+/* ==================== 打印优化 ==================== */
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .mobile-nav,
+  .mobile-menu,
+  .mobile-bottom-bar {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+}

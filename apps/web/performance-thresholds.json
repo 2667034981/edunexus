@@ -1,0 +1,30 @@
+{
+  "lighthouse": {
+    "performance": 90,
+    "accessibility": 90,
+    "bestPractices": 90,
+    "seo": 90
+  },
+  "webVitals": {
+    "LCP": 2500,
+    "FID": 100,
+    "CLS": 0.1,
+    "FCP": 1500,
+    "TTFB": 800,
+    "INP": 200
+  },
+  "bundleSize": {
+    "total": 512000,
+    "js": 307200,
+    "css": 51200
+  },
+  "loadTime": {
+    "firstLoad": 3000,
+    "subsequentLoad": 1000
+  },
+  "apiResponse": {
+    "average": 500,
+    "p95": 1000,
+    "p99": 2000
+  }
+}

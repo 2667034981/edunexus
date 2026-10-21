@@ -1,0 +1,14 @@
+{
+  "generatedAt": "2026-10-19T11:10:00.000Z",
+  "docCount": 19,
+  "byType": {
+    "note": 15,
+    "source": 4
+  },
+  "byDomain": {
+    "math": 5,
+    "programming": 5,
+    "physics": 3,
+    "cs": 2
+  }
+}
