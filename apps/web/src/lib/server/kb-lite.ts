@@ -634,3 +634,75 @@ export async function getBacklinkGraph(input?: { focusDocId?: string; limit?: nu
     edges
   };
 }
+
+/**
+ * 导出 vault 下所有 Markdown 原文（供一键备份 vault + 本地库使用）。
+ * 返回相对 vault 根目录的路径与原始内容，便于原样恢复。
+ */
+export async function dumpVaultFiles(): Promise<Array<{ relPath: string; content: string }>> {
+  const vaultDir = resolveVaultDir();
+  const result: Array<{ relPath: string; content: string }> = [];
+
+  async function walk(dir: string, prefix: string) {
+    let entries: import("node:fs").Dirent[] = [];
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        if (entry.name === "index" || entry.name.startsWith(".")) continue;
+        await walk(full, rel);
+        continue;
+      }
+      if (!entry.name.endsWith(".md")) continue;
+      try {
+        const content = await fs.readFile(full, "utf8");
+        result.push({ relPath: rel, content });
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  for (const sub of SEARCH_DIRS) {
+    await walk(path.join(vaultDir, sub), sub);
+  }
+  return result;
+}
+
+/** 把备份里的 vault 原文写回磁盘，返回成功写入的文件数。 */
+export async function restoreVaultFiles(
+  files: Array<{ relPath: string; content: string }>
+): Promise<number> {
+  if (!Array.isArray(files) || files.length === 0) {
+    return 0;
+  }
+  const vaultDir = resolveVaultDir();
+  let written = 0;
+
+  for (const file of files) {
+    if (!file || typeof file.relPath !== "string" || typeof file.content !== "string") {
+      continue;
+    }
+    const safeRel = file.relPath.replace(/\\/g, "/");
+    if (safeRel.includes("..") || path.isAbsolute(safeRel)) {
+      continue;
+    }
+    if (!safeRel.endsWith(".md")) {
+      continue;
+    }
+    const target = path.join(vaultDir, safeRel);
+    try {
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      await fs.writeFile(target, file.content, "utf8");
+      written += 1;
+    } catch {
+      continue;
+    }
+  }
+  return written;
+}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadDb, saveDb, type DbSchema } from "@/lib/server/store";
+import { restoreVaultFiles } from "@/lib/server/kb-lite";
 
 export const runtime = "nodejs";
 
@@ -49,7 +50,24 @@ export async function POST(request: NextRequest) {
     };
 
     await saveDb(next);
-    return NextResponse.json({ success: true, data: { importedAt: new Date().toISOString() } });
+
+    // 恢复 vault 笔记原文（如果备份里带了）
+    let restoredVaultFiles = 0;
+    try {
+      const vault = (body as { vault?: unknown }).vault;
+      if (Array.isArray(vault)) {
+        restoredVaultFiles = await restoreVaultFiles(
+          vault as Array<{ relPath: string; content: string }>
+        );
+      }
+    } catch {
+      restoredVaultFiles = 0;
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: { importedAt: new Date().toISOString(), restoredVaultFiles },
+    });
   } catch (error) {
     return NextResponse.json(
       {

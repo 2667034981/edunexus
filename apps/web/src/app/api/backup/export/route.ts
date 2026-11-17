@@ -1,17 +1,23 @@
 import { NextResponse } from "next/server";
 import { loadDb, type DbSchema } from "@/lib/server/store";
+import { dumpVaultFiles } from "@/lib/server/kb-lite";
 
 export const runtime = "nodejs";
 
-/** 导出服务端 db.json 全量（单机备份用） */
+/** 一键备份：服务端 db.json 全量 + vault 笔记原文（单机备份用） */
 export async function GET() {
   try {
-    const db = await loadDb();
+    const [db, vault] = await Promise.all([
+      loadDb(),
+      dumpVaultFiles().catch(() => [] as Array<{ relPath: string; content: string }>),
+    ]);
     return NextResponse.json({
       success: true,
       data: {
         exportedAt: new Date().toISOString(),
+        version: 2,
         db,
+        vault,
       },
     });
   } catch (error) {
