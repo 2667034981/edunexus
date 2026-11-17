@@ -1,6 +1,8 @@
 import { fail, ok } from "@/lib/server/response";
 import { saveNoteSchema } from "@/lib/server/schema";
 import { saveNoteFromSession } from "@/lib/server/kb-lite";
+import { appendLearningSession } from "@/lib/server/learning-session-store";
+import { SERVER_FALLBACK_USER_ID } from "@/lib/identity/local-user";
 
 export const runtime = "nodejs";
 
@@ -23,6 +25,25 @@ export async function POST(request: Request) {
       tags: parsed.data.tags,
       links: parsed.data.links
     });
+
+    // 笔记保存回流到学习分析
+    const userId =
+      (typeof (json as { userId?: string }).userId === "string" &&
+        (json as { userId?: string }).userId) ||
+      SERVER_FALLBACK_USER_ID;
+    const now = new Date();
+    void appendLearningSession({
+      sessionId: `note_${Date.now()}`,
+      userId,
+      startTime: new Date(now.getTime() - 60_000).toISOString(),
+      endTime: now.toISOString(),
+      duration: 2,
+      activityType: "document_create",
+      metadata: {
+        documentTitle: parsed.data.title,
+        documentId: (saved as { id?: string })?.id,
+      },
+    }).catch(() => undefined);
 
     return ok(saved);
   } catch (error) {

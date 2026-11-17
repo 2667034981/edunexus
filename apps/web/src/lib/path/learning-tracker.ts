@@ -3,6 +3,8 @@
  */
 
 import type { LearningRecord } from '../path/skill-tree-types';
+import { getLocalUserId } from '../identity/local-user';
+import { recordLearningActivity } from '../client/learning-activity';
 
 // IndexedDB 配置
 const DB_NAME = 'EduNexusLearning';
@@ -116,23 +118,51 @@ export class LearningTracker {
   async trackEvent(event: Omit<LearningEvent, 'id' | 'timestamp'>): Promise<string> {
     if (!this.db) await this.initialize();
 
+    let userId = event.userId;
+    if (!userId || userId === 'default') {
+      try {
+        userId = getLocalUserId();
+      } catch {
+        userId = 'local_default';
+      }
+    }
+
     const eventId = `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const fullEvent: LearningEvent = {
       ...event,
+      userId,
       id: eventId,
       timestamp: new Date(),
     };
 
     console.debug('[LearningTracker] Tracking event:', fullEvent.action, fullEvent);
 
-    // 保存事件
     await this.saveEvent(fullEvent);
-
-    // 更新当前会话
     await this.updateSession(eventId);
-
-    // 更新统计
     await this.updateStats(fullEvent);
+
+    // 回流到服务端分析库（异步，不阻塞 UI）
+    const activityType =
+      fullEvent.action === 'create'
+        ? 'document_create'
+        : fullEvent.action === 'edit'
+          ? 'document_edit'
+          : fullEvent.action === 'practice'
+            ? 'practice'
+            : fullEvent.action === 'view'
+              ? 'reading'
+              : 'chat';
+
+    void recordLearningActivity({
+      userId,
+      activityType,
+      durationMinutes: Math.max(1, Math.round((fullEvent.duration || 60) / 60)),
+      metadata: {
+        documentId: fullEvent.documentId,
+        documentTitle: fullEvent.metadata?.title,
+        knowledgePoints: fullEvent.graphNodeId ? [fullEvent.graphNodeId] : undefined,
+      },
+    });
 
     return eventId;
   }
@@ -179,9 +209,15 @@ export class LearningTracker {
    */
   private async startNewSession(): Promise<void> {
     const sessionId = `session_${Date.now()}`;
+    let userId = 'local_default';
+    try {
+      userId = getLocalUserId();
+    } catch {
+      // SSR / 无 window
+    }
     this.currentSession = {
       id: sessionId,
-      userId: 'default', // TODO: 从用户上下文获取
+      userId,
       startTime: new Date(),
       activities: [],
     };

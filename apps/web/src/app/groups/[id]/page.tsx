@@ -37,6 +37,7 @@ import {
   addResource,
 } from '@/lib/groups/group-storage';
 import type { Group, GroupMember, GroupPost, GroupTask, GroupResource, GroupStats } from '@/lib/groups/group-types';
+import { useLocalUser } from '@/lib/identity/user-provider';
 
 type TabType = 'discussion' | 'members' | 'tasks' | 'resources' | 'leaderboard' | 'stats';
 
@@ -44,6 +45,7 @@ export default function GroupDetailPage() {
   const params = useParams();
   const router = useRouter();
   const groupId = params.id as string;
+  const { userId, ready } = useLocalUser();
 
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<GroupMember[]>([]);
@@ -55,11 +57,12 @@ export default function GroupDetailPage() {
   const [isMember, setIsMember] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
 
-  const currentUserId = 'user-1';
+  const currentUserId = userId;
 
   useEffect(() => {
+    if (!ready) return;
     loadGroupData();
-  }, [groupId]);
+  }, [groupId, ready, userId]);
 
   const loadGroupData = () => {
     const groupData = getGroupById(groupId);

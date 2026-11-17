@@ -1,0 +1,78 @@
+import type { Metadata, Viewport } from "next";
+import { Inter, JetBrains_Mono } from "next/font/google";
+import "./globals.css";
+import { AppShell } from "@/components/layout/AppShell";
+import { QueryProvider } from "@/lib/providers/query-provider";
+import { PWAInit } from "@/components/pwa/pwa-init";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
+import { OfflineIndicator } from "@/components/pwa/offline-indicator";
+import { NotificationPermission } from "@/components/pwa/notification-permission";
+import { UpdatePrompt } from "@/components/pwa/update-prompt";
+import { GlobalAIAssistant } from "@/components/global/global-ai-assistant";
+import { DocumentProvider } from "@/lib/ai/document-context";
+import { Toaster } from "@/components/ui/sonner";
+import { KGSyncBootstrap } from "@/components/sync/kg-sync-bootstrap";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+});
+
+export const metadata: Metadata = {
+  title: "EduNexus | AI 教育生态平台",
+  description: "以知识建构为核心的 Web-only AI 教育平台",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "EduNexus",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#3b82f6",
+};
+
+export default function RootLayout({
+  children
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="zh-CN" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+      <head>
+        <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js" async></script>
+        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/icon.svg" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+      </head>
+      <body>
+        <QueryProvider>
+          <DocumentProvider>
+            <PWAInit />
+            <KGSyncBootstrap />
+            <AppShell>{children}</AppShell>
+            <InstallPrompt />
+            <OfflineIndicator />
+            <NotificationPermission />
+            <UpdatePrompt />
+            <GlobalAIAssistant />
+            <Toaster />
+          </DocumentProvider>
+        </QueryProvider>
+      </body>
+    </html>
+  );
+}

@@ -6,6 +6,8 @@ import { getKGSyncService } from '../graph/kg-sync-service';
 import { getLearningTracker } from '../path/learning-tracker';
 import type { KBDocument } from '../client/kb-storage';
 import type { SkillNode } from '../path/skill-tree-types';
+import { getLocalUserId } from '../identity/local-user';
+import { recordLearningActivity } from '../client/learning-activity';
 
 /**
  * 同步任务类型
@@ -223,11 +225,20 @@ export class DataSyncManager {
     }
   }
 
+  private resolveUserId(): string {
+    try {
+      return getLocalUserId();
+    } catch {
+      return 'local_default';
+    }
+  }
+
   /**
    * 同步文档数据
    */
   private async syncDocumentData(document: KBDocument): Promise<Record<string, any>> {
     console.debug('[DataSyncManager] Syncing document:', document.id);
+    const userId = this.resolveUserId();
 
     // 1. 同步到知识图谱
     const graphNodeId = await this.kgSync.syncDocumentToGraph({
@@ -241,7 +252,7 @@ export class DataSyncManager {
 
     // 2. 记录学习事件
     await this.learningTracker.trackEvent({
-      userId: 'default', // TODO: 从用户上下文获取
+      userId,
       documentId: document.id,
       graphNodeId,
       action: document.createdAt.getTime() === document.updatedAt.getTime() ? 'create' : 'edit',
@@ -256,7 +267,7 @@ export class DataSyncManager {
     if (document.skillNodeIds && document.skillNodeIds.length > 0) {
       for (const skillNodeId of document.skillNodeIds) {
         await this.learningTracker.trackEvent({
-          userId: 'default',
+          userId,
           documentId: document.id,
           skillNodeId,
           action: 'review',
@@ -275,6 +286,7 @@ export class DataSyncManager {
    */
   private async syncSkillNodeData(skillNode: SkillNode): Promise<Record<string, any>> {
     console.debug('[DataSyncManager] Syncing skill node:', skillNode.id);
+    const userId = this.resolveUserId();
 
     // 1. 如果有关联的知识图谱节点，更新图谱
     if (skillNode.graphNodeId) {
@@ -290,7 +302,7 @@ export class DataSyncManager {
     // 2. 记录学习事件
     const action = this.mapSkillStatusToAction(skillNode.status);
     await this.learningTracker.trackEvent({
-      userId: 'default',
+      userId,
       skillNodeId: skillNode.id,
       graphNodeId: skillNode.graphNodeId,
       action,
@@ -304,7 +316,7 @@ export class DataSyncManager {
     // 3. 如果技能完成，记录完成事件
     if (skillNode.status === 'completed' && skillNode.completedAt) {
       await this.learningTracker.trackEvent({
-        userId: 'default',
+        userId,
         skillNodeId: skillNode.id,
         action: 'complete',
         metadata: {
@@ -322,14 +334,79 @@ export class DataSyncManager {
   }
 
   /**
-   * 同步图谱数据
+   * 同步图谱数据：拉取服务端图谱视图，合并掌握度到本地 KG，并记一次回流
    */
   private async syncGraphData(data: any): Promise<Record<string, any>> {
     console.debug('[DataSyncManager] Syncing graph data');
+    const userId = this.resolveUserId();
 
-    // TODO: 实现图谱数据同步逻辑
+    let nodeCount = 0;
+    let edgeCount = 0;
+    let updated = 0;
+
+    try {
+      const res = await fetch('/api/graph/view');
+      if (res.ok) {
+        const json = await res.json();
+        const payload = json?.data ?? json;
+        const nodes = Array.isArray(payload?.nodes) ? payload.nodes : [];
+        const edges = Array.isArray(payload?.edges) ? payload.edges : [];
+        nodeCount = nodes.length;
+        edgeCount = edges.length;
+
+        for (const remote of nodes) {
+          if (!remote?.id) continue;
+          const existing = await this.kgSync.getNode(remote.id);
+          const mastery =
+            typeof remote.mastery === 'number' ? remote.mastery : existing?.mastery ?? 0.45;
+          const status: 'unlearned' | 'learning' | 'mastered' | 'review' =
+            mastery >= 0.8 ? 'mastered' : mastery >= 0.35 ? 'learning' : 'unlearned';
+
+          if (existing) {
+            existing.mastery = mastery;
+            existing.status = status;
+            existing.updatedAt = new Date();
+            if (remote.label) existing.name = remote.label;
+            await this.kgSync.upsertNode(existing);
+            updated += 1;
+          } else {
+            await this.kgSync.upsertNode({
+              id: remote.id,
+              name: remote.label || remote.id,
+              type: 'concept',
+              status,
+              importance: 0.5,
+              mastery,
+              connections: 0,
+              noteCount: 0,
+              practiceCount: 0,
+              practiceCompleted: 0,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              documentIds: [],
+              keywords: [],
+            });
+            updated += 1;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[DataSyncManager] graph view fetch failed', err);
+    }
+
+    void recordLearningActivity({
+      userId,
+      activityType: 'reading',
+      durationMinutes: 1,
+      metadata: {
+        knowledgePoints: data?.nodeId ? [String(data.nodeId)] : undefined,
+      },
+    });
 
     return {
+      nodeCount,
+      edgeCount,
+      updated,
       syncedAt: new Date().toISOString(),
     };
   }

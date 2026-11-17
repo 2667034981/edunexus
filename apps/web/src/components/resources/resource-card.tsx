@@ -34,6 +34,7 @@ import {
   incrementViewCount,
   deleteResource,
 } from "@/lib/resources/resource-storage";
+import { getLocalUserId } from "@/lib/identity/local-user";
 
 interface ResourceCardProps {
   resource: Resource;
@@ -59,8 +60,9 @@ const typeColors = {
 };
 
 export function ResourceCard({ resource, onDelete, onEdit, onBookmark }: ResourceCardProps) {
+  const userId = getLocalUserId();
   const [isBookmarked, setIsBookmarked] = useState(() => {
-    return getBookmarkByResourceId(resource.id, "demo_user") !== null;
+    return getBookmarkByResourceId(resource.id, userId) !== null;
   });
   const [showPreview, setShowPreview] = useState(false);
 
@@ -68,14 +70,14 @@ export function ResourceCard({ resource, onDelete, onEdit, onBookmark }: Resourc
 
   const handleBookmark = () => {
     if (isBookmarked) {
-      const bookmark = getBookmarkByResourceId(resource.id, "demo_user");
+      const bookmark = getBookmarkByResourceId(resource.id, userId);
       if (bookmark) {
         deleteBookmark(bookmark.id);
         setIsBookmarked(false);
       }
     } else {
       createBookmark({
-        userId: "demo_user",
+        userId,
         resourceId: resource.id,
       });
       setIsBookmarked(true);

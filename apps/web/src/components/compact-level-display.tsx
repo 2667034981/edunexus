@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ExpProgressBar } from './exp-progress-bar';
+import { useLocalUser } from '@/lib/identity/user-provider';
 
 interface CompactLevelDisplayProps {
   userId?: string;
@@ -11,30 +12,37 @@ interface CompactLevelDisplayProps {
 }
 
 export function CompactLevelDisplay({
-  userId = 'demo_user',
+  userId: userIdProp,
   showProgress = true,
   className = ''
 }: CompactLevelDisplayProps) {
+  const { userId: localUserId, ready } = useLocalUser();
+  const userId = userIdProp || localUserId;
   const [levelData, setLevelData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!ready || !userId) return;
+    let cancelled = false;
     async function fetchLevel() {
       try {
-        const res = await fetch(`/api/user/level?userId=${userId}`);
+        const res = await fetch(`/api/user/level?userId=${encodeURIComponent(userId)}`);
         const json = await res.json();
-        if (json.success) {
+        if (!cancelled && json.success) {
           setLevelData(json.data);
         }
       } catch (error) {
         console.error('加载等级数据失败:', error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     fetchLevel();
-  }, [userId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, ready]);
 
   if (loading || !levelData) {
     return (

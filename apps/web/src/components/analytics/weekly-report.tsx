@@ -17,71 +17,50 @@ import {
 import { Clock, FileText, CheckCircle, TrendingUp, Award } from "lucide-react";
 import { ActivityHeatmap } from "./activity-heatmap";
 import type { WeeklyReport as WeeklyReportType } from "@/lib/analytics/report-generator";
+import { useLocalUser } from "@/lib/identity/user-provider";
 
 interface WeeklyReportProps {
   date: Date;
 }
 
 export function WeeklyReport({ date }: WeeklyReportProps) {
+  const { userId, ready } = useLocalUser();
   const [report, setReport] = useState<WeeklyReportType | null>(null);
   const [loading, setLoading] = useState(true);
+  const [emptyHint, setEmptyHint] = useState(false);
 
   useEffect(() => {
-    // 实际应用中从 API 获取数据
-    // 这里使用模拟数据
-    const mockReport: WeeklyReportType = {
-      period: {
-        start: "2026-03-03",
-        end: "2026-03-09",
-        weekNumber: 10,
-      },
-      summary: {
-        totalStudyTime: 720,
-        avgDailyTime: 103,
-        totalSessions: 28,
-        documentsCreated: 5,
-        documentsEdited: 12,
-        practicesCompleted: 15,
-        practiceAccuracy: 82,
-      },
-      dailyBreakdown: [
-        { date: "2026-03-03", studyTime: 90, activities: 4 },
-        { date: "2026-03-04", studyTime: 120, activities: 5 },
-        { date: "2026-03-05", studyTime: 105, activities: 4 },
-        { date: "2026-03-06", studyTime: 95, activities: 3 },
-        { date: "2026-03-07", studyTime: 110, activities: 5 },
-        { date: "2026-03-08", studyTime: 100, activities: 4 },
-        { date: "2026-03-09", studyTime: 100, activities: 3 },
-      ],
-      topActivities: [
-        { type: "编辑文档", duration: 280, percentage: 39 },
-        { type: "练习题目", duration: 240, percentage: 33 },
-        { type: "AI 对话", duration: 150, percentage: 21 },
-        { type: "创建文档", duration: 50, percentage: 7 },
-      ],
-      achievements: [
-        "本周学习超过10小时",
-        "保持每日学习习惯",
-        "连续学习 7 天",
-      ],
-      insights: [
-        "学习时长呈上升趋势，保持良好势头",
-        "本周每天都有学习，坚持得很好",
-      ],
-      suggestions: [
-        "练习正确率良好，继续保持",
-        "可以尝试更多样化的学习方式",
-      ],
-    };
+    if (!ready || !userId) return;
+    let cancelled = false;
+    setLoading(true);
 
-    setTimeout(() => {
-      setReport(mockReport);
-      setLoading(false);
-    }, 500);
-  }, [date]);
+    (async () => {
+      try {
+        const qs = new URLSearchParams({
+          userId,
+          date: date.toISOString(),
+        });
+        const res = await fetch(`/api/analytics/weekly-report?${qs}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as WeeklyReportType;
+        if (cancelled) return;
+        setReport(data);
+        setEmptyHint((data.summary?.totalSessions ?? 0) === 0);
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) setReport(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [date, userId, ready]);
 
   if (loading || !report) {
-    return <div className="text-center py-8">加载中...</div>;
+    return <div className="text-center py-8">{loading ? "加载中..." : "暂无周报数据"}</div>;
   }
 
   const formatTime = (minutes: number) => {
@@ -101,6 +80,13 @@ export function WeeklyReport({ date }: WeeklyReportProps) {
 
   return (
     <div className="space-y-6">
+      {emptyHint && (
+        <Card>
+          <CardContent className="py-4 text-sm text-muted-foreground">
+            本周尚无回流学习记录。在「学习工作区」对话、保存笔记或完成练习后，这里会显示真实统计。
+          </CardContent>
+        </Card>
+      )}
       {/* 报告标题 */}
       <Card>
         <CardHeader>

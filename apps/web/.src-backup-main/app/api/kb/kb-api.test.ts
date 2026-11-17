@@ -1,0 +1,197 @@
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { GET as searchKb } from "./search/route";
+import { GET as getDoc, PATCH as updateDoc, DELETE as deleteDoc } from "./doc/[id]/route";
+import { GET as listDocs, POST as createDoc } from "./docs/route";
+import { GET as getTags } from "./tags/route";
+import { GET as getBacklinkGraph } from "./backlinks/graph/route";
+import { POST as rebuildIndex } from "./index/rebuild/route";
+import {
+  cleanupSandbox,
+  createSandbox,
+  writeMarkdown
+} from "@/tests/test-helpers";
+
+type Sandbox = Awaited<ReturnType<typeof createSandbox>>;
+
+describe("kb api", () => {
+  let sandbox: Sandbox;
+
+  beforeAll(async () => {
+    sandbox = await createSandbox("kb");
+    process.env.EDUNEXUS_VAULT_DIR = sandbox.vaultDir;
+
+    await writeMarkdown(
+      sandbox.vaultDir,
+      "notes/note_seq.md",
+      [
+        "---",
+        "id: note_seq",
+        "title: 数列复盘",
+        "type: note",
+        "domain: math",
+        "tags: [数列, 复盘]",
+        "links: [source_ch5]",
+        "source_refs: [book_ch5]",
+        "owner: test",
+        "---",
+        "",
+        "先判断是等差还是等比，再代入对应公式。"
+      ].join("\n")
+    );
+
+    await writeMarkdown(
+      sandbox.vaultDir,
+      "sources/source_ch5.md",
+      [
+        "---",
+        "id: source_ch5",
+        "title: 教材第五章",
+        "type: source",
+        "domain: math",
+        "tags: [教材]",
+        "links: []",
+        "source_refs: [textbook]",
+        "owner: test",
+        "---",
+        "",
+        "本章重点在于数列求和与函数联动。"
+      ].join("\n")
+    );
+  });
+
+  afterAll(async () => {
+    delete process.env.EDUNEXUS_VAULT_DIR;
+    await cleanupSandbox(sandbox.rootDir);
+  });
+
+  it("supports search, doc detail, tags and backlink graph", async () => {
+    const searchRes = await searchKb(
+      new Request("http://localhost/api/kb/search?q=数列")
+    );
+    expect(searchRes.status).toBe(200);
+    const searchJson = (await searchRes.json()) as {
+      data: { candidates: Array<{ docId: string }> };
+    };
+    expect(searchJson.data.candidates.length).toBeGreaterThan(0);
+    expect(
+      searchJson.data.candidates.some((item) => item.docId === "note_seq")
+    ).toBe(true);
+
+    const searchByIdRes = await searchKb(
+      new Request("http://localhost/api/kb/search?q=note_seq")
+    );
+    expect(searchByIdRes.status).toBe(200);
+    const searchByIdJson = (await searchByIdRes.json()) as {
+      data: { candidates: Array<{ docId: string; reason: string[] }> };
+    };
+    expect(
+      searchByIdJson.data.candidates.some((item) => item.docId === "note_seq")
+    ).toBe(true);
+    const noteCandidate = searchByIdJson.data.candidates.find(
+      (item) => item.docId === "note_seq"
+    );
+    expect(noteCandidate?.reason).toContain("id_exact");
+
+    const docRes = await getDoc(new Request("http://localhost"), {
+      params: Promise.resolve({ id: "source_ch5" })
+    });
+    expect(docRes.status).toBe(200);
+    const docJson = (await docRes.json()) as {
+      data: { doc: { id: string; backlinks: string[] } };
+    };
+    expect(docJson.data.doc.id).toBe("source_ch5");
+    expect(docJson.data.doc.backlinks).toContain("note_seq");
+
+    const tagsRes = await getTags();
+    expect(tagsRes.status).toBe(200);
+    const tagsJson = (await tagsRes.json()) as {
+      data: { tags: Array<{ tag: string; count: number }> };
+    };
+    expect(tagsJson.data.tags.some((item) => item.tag === "数列")).toBe(true);
+
+    const graphRes = await getBacklinkGraph(
+      new Request("http://localhost/api/kb/backlinks/graph?focusDocId=source_ch5")
+    );
+    expect(graphRes.status).toBe(200);
+    const graphJson = (await graphRes.json()) as {
+      data: { edges: Array<{ source: string; target: string }> };
+    };
+    expect(
+      graphJson.data.edges.some(
+        (edge) => edge.source === "note_seq" && edge.target === "source_ch5"
+      )
+    ).toBe(true);
+  });
+
+  it("can rebuild index summary", async () => {
+    const rebuildRes = await rebuildIndex();
+    expect(rebuildRes.status).toBe(200);
+    const rebuildJson = (await rebuildRes.json()) as {
+      data: { docCount: number; byType: Record<string, number> };
+    };
+    expect(rebuildJson.data.docCount).toBeGreaterThanOrEqual(2);
+    expect(rebuildJson.data.byType.note).toBeGreaterThanOrEqual(1);
+  });
+
+  it("supports kb document CRUD via server routes", async () => {
+    const createRes = await createDoc(
+      new Request("http://localhost/api/kb/docs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "新建知识文档",
+          content: "这是服务端创建的知识文档。",
+          tags: ["服务端", "文档"],
+          links: ["note_seq"],
+          domain: "general",
+          type: "note",
+          vaultId: "default"
+        })
+      })
+    );
+    expect(createRes.status).toBe(200);
+    const createJson = (await createRes.json()) as {
+      data: { doc: { id: string; title: string } };
+    };
+    const createdId = createJson.data.doc.id;
+    expect(createJson.data.doc.title).toBe("新建知识文档");
+
+    const listRes = await listDocs(
+      new Request("http://localhost/api/kb/docs?vaultId=default")
+    );
+    expect(listRes.status).toBe(200);
+    const listJson = (await listRes.json()) as {
+      data: { docs: Array<{ id: string }> };
+    };
+    expect(listJson.data.docs.some((doc) => doc.id === createdId)).toBe(true);
+
+    const updateRes = await updateDoc(
+      new Request(`http://localhost/api/kb/doc/${createdId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "更新后的知识文档",
+          content: "更新后的内容。",
+          tags: ["更新后"]
+        })
+      }),
+      { params: Promise.resolve({ id: createdId }) }
+    );
+    expect(updateRes.status).toBe(200);
+    const updateJson = (await updateRes.json()) as {
+      data: { doc: { title: string; tags: string[] } };
+    };
+    expect(updateJson.data.doc.title).toBe("更新后的知识文档");
+    expect(updateJson.data.doc.tags).toContain("更新后");
+
+    const deleteRes = await deleteDoc(new Request("http://localhost"), {
+      params: Promise.resolve({ id: createdId })
+    });
+    expect(deleteRes.status).toBe(200);
+
+    const afterDeleteRes = await getDoc(new Request("http://localhost"), {
+      params: Promise.resolve({ id: createdId })
+    });
+    expect(afterDeleteRes.status).toBe(404);
+  });
+});

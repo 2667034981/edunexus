@@ -19,6 +19,9 @@ import { GeneralSettingsPanel } from "@/components/settings/general-settings-pan
 import { ModelConfigPanel } from "@/components/settings/model-config-panel";
 import { JsonImportPanel } from "@/components/settings/json-import-panel";
 import { ImportAuditLogPanel } from "@/components/settings/import-audit-log-panel";
+import { DataBackupPanel } from "@/components/settings/data-backup-panel";
+import { downloadBackupFile } from "@/lib/client/backup";
+import { toast } from "@/lib/toast";
 
 type SettingsSection =
   | "general"
@@ -83,25 +86,15 @@ export default function SettingsPage() {
     alert('设置已保存');
   }, []);
 
-  // 导出配置
-  const handleExportConfig = useCallback(() => {
-    const config = {
-      theme,
-      language,
-      temperature,
-      topP,
-      maxTokens,
-      apiKey: apiKey ? '***' : ''
-    };
-    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'edunexus-config.json';
-    a.click();
-    URL.revokeObjectURL(url);
-    alert('配置已导出');
-  }, [theme, language, temperature, topP, maxTokens, apiKey]);
+  // 导出配置 → 改为完整备份
+  const handleExportConfig = useCallback(async () => {
+    try {
+      await downloadBackupFile();
+      toast("完整备份已导出", "success");
+    } catch {
+      toast("导出失败", "error");
+    }
+  }, []);
 
   // 导入配置
   const handleImportConfig = useCallback(() => {
@@ -156,26 +149,14 @@ export default function SettingsPage() {
           />
         );
       case "data":
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-semibold tracking-tight">数据管理</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                管理应用数据存储和清理
-              </p>
-            </div>
-            <Card className="p-6">
-              <p className="text-muted-foreground">数据管理功能开发中...</p>
-            </Card>
-          </div>
-        );
+        return <DataBackupPanel />;
       case "import-export":
         return (
           <div className="space-y-6">
             <div>
               <h2 className="text-2xl font-semibold tracking-tight">导入/导出</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                导入或导出应用数据
+                JSON 配置导入，以及完整学习数据备份
               </p>
             </div>
             <div className="grid gap-6">
@@ -184,15 +165,15 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-3 mb-4">
                   <Download className="h-5 w-5" />
                   <div>
-                    <h3 className="font-semibold">数据导出</h3>
+                    <h3 className="font-semibold">完整备份导出</h3>
                     <p className="text-sm text-muted-foreground">
-                      导出所有数据为 JSON 格式
+                      包含本地身份、localStorage 关键键与服务端 db
                     </p>
                   </div>
                 </div>
                 <Button variant="outline" className="w-full" onClick={handleExportConfig}>
                   <Download className="h-4 w-4 mr-2" />
-                  导出数据
+                  导出完整备份
                 </Button>
               </Card>
             </div>

@@ -14,58 +14,47 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { LearningInsights } from "@/lib/analytics/report-generator";
+import { useLocalUser } from "@/lib/identity/user-provider";
 
 interface AISuggestionsProps {
   reportType: "weekly" | "monthly";
 }
 
 export function AISuggestions({ reportType }: AISuggestionsProps) {
+  const { userId, ready } = useLocalUser();
   const [insights, setInsights] = useState<LearningInsights | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
 
-  useEffect(() => {
-    // 实际应用中从 API 获取 AI 生成的建议
-    const mockInsights: LearningInsights = {
-      studyPattern: {
-        preferredTimeSlots: ["上午 9-11点", "晚上 8-10点"],
-        avgSessionLength: 45,
-        consistency: 78,
-      },
-      strengths: [
-        "学习时长充足，保持了良好的学习习惯",
-        "练习正确率高，知识掌握扎实",
-        "文档整理规范，便于后续复习",
-      ],
-      weaknesses: [
-        "知识点覆盖面较窄，建议拓展学习领域",
-        "部分知识点掌握度偏低，需要重点复习",
-        "学习时间分布不够均匀，周末学习较少",
-      ],
-      recommendations: [
-        "建议每周安排2-3次深度学习时间，每次1-2小时",
-        "可以尝试使用费曼学习法，通过教授他人来巩固知识",
-        "定期回顾错题和薄弱知识点，建立知识体系",
-        "参与社区讨论，与其他学习者交流经验",
-      ],
-      nextSteps: [
-        "本周重点：复习算法设计相关知识点",
-        "完成至少3个实践项目，应用所学知识",
-        "每天保持至少30分钟的学习时间",
-        "整理本月学习笔记，建立知识图谱",
-      ],
-    };
-
-    setTimeout(() => {
-      setInsights(mockInsights);
+  const loadInsights = async () => {
+    if (!userId) return;
+    setLoading(true);
+    try {
+      const qs = new URLSearchParams({
+        userId,
+        period: reportType === "weekly" ? "week" : "month",
+      });
+      const res = await fetch(`/api/analytics/insights?${qs}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as LearningInsights;
+      setInsights(data);
+    } catch (err) {
+      console.error(err);
+      setInsights(null);
+    } finally {
       setLoading(false);
-    }, 800);
-  }, [reportType]);
+    }
+  };
+
+  useEffect(() => {
+    if (!ready || !userId) return;
+    void loadInsights();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportType, userId, ready]);
 
   const handleRegenerate = async () => {
     setGenerating(true);
-    // 模拟 AI 重新生成建议
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await loadInsights();
     setGenerating(false);
   };
 

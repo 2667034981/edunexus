@@ -13,6 +13,7 @@ import {
   joinGroupByInviteCode,
 } from '@/lib/groups/group-storage';
 import type { Group, GroupCategory } from '@/lib/groups/group-types';
+import { useLocalUser } from '@/lib/identity/user-provider';
 
 const categories: Array<{ value: GroupCategory | 'all'; label: string }> = [
   { value: 'all', label: '全部' },
@@ -29,6 +30,7 @@ type SortBy = 'activity' | 'members' | 'newest';
 
 export default function GroupsPage() {
   const router = useRouter();
+  const { userId } = useLocalUser();
   const [groups, setGroups] = useState<Group[]>([]);
   const [filteredGroups, setFilteredGroups] = useState<Group[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,7 +79,8 @@ export default function GroupsPage() {
   };
 
   const handleJoinByInviteCode = (inviteCode: string) => {
-    const result = joinGroupByInviteCode(inviteCode, 'user-1', '当前用户');
+    if (!userId) return;
+    const result = joinGroupByInviteCode(inviteCode, userId, '本地学习者');
     if (result.success && result.groupId) {
       setShowInviteCodeDialog(false);
       router.push(`/groups/${result.groupId}`);
@@ -191,7 +194,7 @@ export default function GroupsPage() {
 
           <div className="lg:col-span-1">
             <GroupRecommendations
-              userId="user-1"
+              userId={userId || 'local_default'}
               onGroupClick={(groupId) => router.push(`/groups/${groupId}`)}
             />
           </div>

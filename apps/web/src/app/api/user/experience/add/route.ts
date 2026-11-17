@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const validated = addExpSchema.parse(body);
 
-    const userId = validated.userId || 'demo_user';
+    const userId = validated.userId || 'local_default';
     const result = await addExperience(userId, validated.eventType, validated.metadata);
 
     return NextResponse.json({

@@ -53,6 +53,8 @@ import {
   type ChatMessage,
   type AgentToolStep,
 } from "@/lib/workspace/chat-history-storage";
+import { recordLearningActivity } from "@/lib/client/learning-activity";
+import { getLocalUserId } from "@/lib/identity/local-user";
 import {
   getAllTeachers,
   type AITeacher,
@@ -546,6 +548,17 @@ function WorkspacePageContent() {
       } catch (storageError) {
         console.error("保存对话历史失败:", storageError);
       }
+
+      // 学习闭环：对话回流到分析库
+      void recordLearningActivity({
+        userId: getLocalUserId(),
+        activityType: "chat",
+        durationMinutes: 2,
+        metadata: {
+          documentTitle: taskContext?.taskTitle || taskContext?.pathTitle,
+          knowledgePoints: taskContext?.taskId ? [taskContext.taskId] : undefined,
+        },
+      });
     } catch (error) {
       console.error("Chat error:", error);
       const errorMessage: Message = {

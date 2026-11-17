@@ -32,30 +32,36 @@ import { ThemeToggle } from '@/components/theme-toggle'
 
 const navigation = [
   {
-    title: '核心功能',
+    title: '主链路',
     items: [
       { name: '总览', href: '/', icon: Home },
-      { name: '🌌 知识星图', href: '/graph', icon: Network },
-      { name: '📚 知识宝库', href: '/kb', icon: BookOpen },
-      { name: '🎮 成长地图', href: '/path', icon: Route },
-      { name: '🛤️ 学习路径', href: '/learning-paths', icon: GitBranch },
-      { name: '🎯 目标管理', href: '/goals', icon: Target },
-      { name: '📦 资源中心', href: '/resources', icon: FolderOpen },
-      { name: '👥 学习小组', href: '/groups', icon: Users },
-      { name: '💬 学习社区', href: '/community', icon: Users },
+      { name: '学习工作区', href: '/workspace', icon: Briefcase },
+      { name: '知识星图', href: '/graph', icon: Network },
+      { name: '成长地图', href: '/path', icon: Route },
+      { name: '知识宝库', href: '/kb', icon: BookOpen },
+      { name: '学习分析', href: '/workspace/analytics', icon: BarChart3 },
     ],
   },
   {
-    title: '工作区',
+    title: '个人工具',
     items: [
-      { name: '学习工作区', href: '/workspace', icon: Briefcase },
-      { name: '学习分析', href: '/workspace/analytics', icon: BarChart3 },
+      { name: '目标管理', href: '/goals', icon: Target },
+      { name: '资源中心', href: '/resources', icon: FolderOpen },
+      { name: '学习路径库', href: '/learning-paths', icon: GitBranch },
+      { name: '练习题库', href: '/workspace/practice/questions', icon: BookOpen },
     ],
   },
   {
     title: '系统',
     items: [
-      { name: '配置中心', href: '/settings', icon: Settings },
+      { name: '配置与备份', href: '/settings', icon: Settings },
+    ],
+  },
+  {
+    title: '生态（演示）',
+    items: [
+      { name: '学习小组', href: '/groups', icon: Users },
+      { name: '学习社区', href: '/community', icon: Users },
     ],
   },
 ] as const

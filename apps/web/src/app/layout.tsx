@@ -12,6 +12,7 @@ import { GlobalAIAssistant } from "@/components/global/global-ai-assistant";
 import { DocumentProvider } from "@/lib/ai/document-context";
 import { Toaster } from "@/components/ui/sonner";
 import { KGSyncBootstrap } from "@/components/sync/kg-sync-bootstrap";
+import { LocalUserProvider } from "@/lib/identity/user-provider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -60,17 +61,19 @@ export default function RootLayout({
       </head>
       <body>
         <QueryProvider>
-          <DocumentProvider>
-            <PWAInit />
-            <KGSyncBootstrap />
-            <AppShell>{children}</AppShell>
-            <InstallPrompt />
-            <OfflineIndicator />
-            <NotificationPermission />
-            <UpdatePrompt />
-            <GlobalAIAssistant />
-            <Toaster />
-          </DocumentProvider>
+          <LocalUserProvider>
+            <DocumentProvider>
+              <PWAInit />
+              <KGSyncBootstrap />
+              <AppShell>{children}</AppShell>
+              <InstallPrompt />
+              <OfflineIndicator />
+              <NotificationPermission />
+              <UpdatePrompt />
+              <GlobalAIAssistant />
+              <Toaster />
+            </DocumentProvider>
+          </LocalUserProvider>
         </QueryProvider>
       </body>
     </html>

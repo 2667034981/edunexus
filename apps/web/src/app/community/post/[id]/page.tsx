@@ -6,14 +6,14 @@ import { ArrowLeft } from 'lucide-react'
 import { PostCard } from '@/components/community/post-card'
 import { CommentList } from '@/components/community/comment-list'
 import { getPostById } from '@/lib/community/post-storage'
-
-const CURRENT_USER_ID = 'demo_user'
-const CURRENT_USER_NAME = '演示用户'
+import { useLocalUser } from '@/lib/identity/user-provider'
 
 export default function PostDetailPage() {
   const params = useParams()
   const router = useRouter()
   const postId = params.id as string
+  const { userId: CURRENT_USER_ID, displayName } = useLocalUser()
+  const CURRENT_USER_NAME = displayName || '本地学习者'
 
   const post = getPostById(postId)
 

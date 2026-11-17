@@ -5,6 +5,7 @@ import { UserLevelCard } from '@/components/user-level-card';
 import { BadgeDisplay } from '@/components/badge-display';
 import { UserStatsDisplay } from '@/components/user-stats-display';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useLocalUser } from '@/lib/identity/user-provider';
 
 interface UserLevelData {
   level: {
@@ -38,16 +39,20 @@ interface AchievementsData {
 }
 
 export default function UserLevelPage() {
+  const { userId, ready } = useLocalUser();
   const [levelData, setLevelData] = useState<UserLevelData | null>(null);
   const [achievementsData, setAchievementsData] = useState<AchievementsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!ready || !userId) return;
+
     async function fetchData() {
       try {
+        const qs = encodeURIComponent(userId);
         const [levelRes, achievementsRes] = await Promise.all([
-          fetch('/api/user/level?userId=demo_user'),
-          fetch('/api/user/achievements?userId=demo_user')
+          fetch(`/api/user/level?userId=${qs}`),
+          fetch(`/api/user/achievements?userId=${qs}`)
         ]);
 
         const levelJson = await levelRes.json();
@@ -68,7 +73,7 @@ export default function UserLevelPage() {
     }
 
     fetchData();
-  }, []);
+  }, [userId, ready]);
 
   if (loading) {
     return (

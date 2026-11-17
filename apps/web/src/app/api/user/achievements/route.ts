@@ -9,7 +9,7 @@ import { BADGE_CONFIGS, getBadgesByCategory } from '@/lib/server/badge-config';
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId') || 'demo_user';
+    const userId = searchParams.get('userId') || 'local_default';
     const category = searchParams.get('category') as any;
 
     const userAchievements = await getUserAchievements(userId);

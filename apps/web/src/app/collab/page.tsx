@@ -26,9 +26,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useLocalUser } from "@/lib/identity/user-provider";
 
 export default function CollabPage() {
   const router = useRouter();
+  const { userId, displayName, ready } = useLocalUser();
   const [sessions, setSessions] = useState<CollabSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -41,12 +43,13 @@ export default function CollabPage() {
   });
 
   useEffect(() => {
+    if (!ready || !userId) return;
     loadSessions();
-  }, []);
+  }, [ready, userId]);
 
   const loadSessions = async () => {
     try {
-      const res = await fetch("/api/collab/session?userId=demo_user");
+      const res = await fetch(`/api/collab/session?userId=${encodeURIComponent(userId)}`);
       if (res.ok) {
         const data = await res.json();
         setSessions(data);
@@ -59,7 +62,7 @@ export default function CollabPage() {
   };
 
   const handleCreateSession = async () => {
-    if (!newSession.title.trim()) return;
+    if (!newSession.title.trim() || !userId) return;
 
     try {
       const res = await fetch("/api/collab/session", {
@@ -67,8 +70,8 @@ export default function CollabPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...newSession,
-          userId: "demo_user",
-          userName: "演示用户",
+          userId,
+          userName: displayName || "本地学习者",
         }),
       });
 

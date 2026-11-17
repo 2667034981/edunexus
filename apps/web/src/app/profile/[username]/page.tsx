@@ -26,11 +26,13 @@ import {
   initializeSampleProfiles
 } from '@/lib/profile/profile-storage';
 import { BADGE_CONFIGS } from '@/lib/server/badge-config';
+import { useLocalUser } from '@/lib/identity/user-provider';
 
 export default function ProfilePage() {
   const params = useParams();
   const router = useRouter();
   const username = params.username as string;
+  const { userId: currentUserId } = useLocalUser();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [socialStats, setSocialStats] = useState<UserSocialStats | null>(null);
@@ -40,8 +42,7 @@ export default function ProfilePage() {
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const currentUserId = 'user_current';
-  const isOwnProfile = profile?.userId === currentUserId;
+  const isOwnProfile = !!profile && !!currentUserId && profile.userId === currentUserId;
 
   useEffect(() => {
     initializeSampleProfiles();

@@ -16,10 +16,11 @@ import {
   updatePrivacySettings
 } from '@/lib/profile/profile-storage';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useLocalUser } from '@/lib/identity/user-provider';
 
 export default function EditProfilePage() {
   const router = useRouter();
-  const currentUserId = 'user_current';
+  const { userId: currentUserId, ready } = useLocalUser();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [privacy, setPrivacy] = useState<PrivacySettings | null>(null);
@@ -48,16 +49,18 @@ export default function EditProfilePage() {
   const [newSkill, setNewSkill] = useState('');
 
   useEffect(() => {
+    if (!ready || !currentUserId) return;
     loadProfile();
-  }, []);
+  }, [ready, currentUserId]);
 
   const loadProfile = () => {
+    if (!currentUserId) return;
     const userProfile = getUserProfile(currentUserId);
     if (!userProfile) {
       const defaultProfile: UserProfile = {
         userId: currentUserId,
-        username: 'current_user',
-        displayName: '当前用户',
+        username: 'local_user',
+        displayName: '本地学习者',
         interests: [],
         skills: [],
         isPublic: true,

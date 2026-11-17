@@ -21,6 +21,7 @@ import { LearningPath, PathProgress, PathNodeData } from '@/lib/path/path-types'
 import { pathStorage, type LearningPath as ClientLearningPath, type TaskStatus } from '@/lib/client/path-storage';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePathSync } from '@/lib/sync';
+import { getLocalUserId } from '@/lib/identity/local-user';
 
 interface PathExecutorProps {
   path: LearningPath;
@@ -104,7 +105,7 @@ function buildLegacyProgress(path: ClientLearningPath): PathProgress {
 
   return {
     pathId: path.id,
-    userId: 'default-user',
+    userId: getLocalUserId(),
     completedNodes,
     currentNode,
     startedAt,

@@ -4,6 +4,7 @@ import path from "node:path";
 import type { UserLevel, UserExperience, UserAchievement, UserStats, ExpGainEvent } from './user-level-types';
 import type { Resource, Bookmark, BookmarkFolder, ResourceNote } from '../resources/resource-types';
 import type { CollabSession, CollabMessage, CollabVersion } from '../collab/collab-types';
+import type { LearningSession } from '../analytics/learning-session';
 
 type SessionRecord = {
   id: string;
@@ -78,6 +79,8 @@ type DbSchema = {
   collabSessions: CollabSession[];
   collabMessages: CollabMessage[];
   collabVersions: CollabVersion[];
+  /** 分析用学习会话（工作区/练习/笔记等回流） */
+  learningSessions: LearningSession[];
 };
 
 const DEFAULT_DB: DbSchema = {
@@ -96,7 +99,8 @@ const DEFAULT_DB: DbSchema = {
   resourceNotes: [],
   collabSessions: [],
   collabMessages: [],
-  collabVersions: []
+  collabVersions: [],
+  learningSessions: []
 };
 
 async function ensureDir(dir: string) {
@@ -131,10 +135,6 @@ function getDbFilePath() {
   if (process.env.EDUNEXUS_DATA_DIR) {
     return path.join(process.env.EDUNEXUS_DATA_DIR, "db.json");
   }
-  // Vercel 等无服务器环境磁盘只读，写入临时目录
-  if (process.env.VERCEL) {
-    return path.join("/tmp", "edunexus", "db.json");
-  }
   const root = findProjectRootSync();
   return path.join(root, ".edunexus", "data", "db.json");
 }
@@ -150,7 +150,7 @@ export async function loadDb(): Promise<DbSchema> {
     const sessions = (parsed.sessions ?? []).map((session) => ({
       id: session.id ?? "",
       title: session.title ?? "未命名学习会话",
-      userId: session.userId ?? "demo_user",
+      userId: session.userId ?? "local_default",
       createdAt: session.createdAt ?? new Date().toISOString(),
       updatedAt: session.updatedAt ?? new Date().toISOString(),
       lastLevel: session.lastLevel ?? 1,
@@ -172,7 +172,10 @@ export async function loadDb(): Promise<DbSchema> {
       resourceNotes: parsed.resourceNotes ?? [],
       collabSessions: parsed.collabSessions ?? [],
       collabMessages: parsed.collabMessages ?? [],
-      collabVersions: parsed.collabVersions ?? []
+      collabVersions: parsed.collabVersions ?? [],
+      learningSessions: Array.isArray(parsed.learningSessions)
+        ? (parsed.learningSessions as LearningSession[])
+        : []
     };
   } catch {
     await fs.writeFile(filePath, JSON.stringify(DEFAULT_DB, null, 2), "utf8");

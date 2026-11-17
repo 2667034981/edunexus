@@ -24,11 +24,13 @@ import {
   Settings,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useLocalUser } from "@/lib/identity/user-provider";
 
 export default function CollabSessionPage() {
   const params = useParams();
   const router = useRouter();
   const sessionId = params.sessionId as string;
+  const { userId, displayName, ready } = useLocalUser();
 
   const [session, setSession] = useState<CollabSession | null>(null);
   const [messages, setMessages] = useState<CollabMessage[]>([]);
@@ -37,14 +39,15 @@ export default function CollabSessionPage() {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("editor");
 
-  const currentUserId = "demo_user";
-  const currentUserName = "演示用户";
+  const currentUserId = userId;
+  const currentUserName = displayName || "本地学习者";
 
   useEffect(() => {
+    if (!ready || !userId) return;
     loadSession();
     loadMessages();
     loadVersions();
-  }, [sessionId]);
+  }, [sessionId, ready, userId]);
 
   const loadSession = async () => {
     try {

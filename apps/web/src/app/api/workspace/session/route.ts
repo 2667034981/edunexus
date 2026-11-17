@@ -17,7 +17,8 @@ export async function POST(request: Request) {
     }
 
     const session = await createSession({
-      title: parsed.data.title
+      title: parsed.data.title,
+      userId: parsed.data.userId,
     });
 
     return ok({ session });

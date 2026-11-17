@@ -30,79 +30,47 @@ import {
   Lightbulb,
 } from "lucide-react";
 import type { MonthlyReport as MonthlyReportType } from "@/lib/analytics/report-generator";
+import { useLocalUser } from "@/lib/identity/user-provider";
 
 interface MonthlyReportProps {
   date: Date;
 }
 
 export function MonthlyReport({ date }: MonthlyReportProps) {
+  const { userId, ready } = useLocalUser();
   const [report, setReport] = useState<MonthlyReportType | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 实际应用中从 API 获取数据
-    const mockReport: MonthlyReportType = {
-      period: {
-        start: "2026-03-01",
-        end: "2026-03-31",
-        month: "2026年3月",
-      },
-      summary: {
-        totalStudyTime: 3120,
-        avgDailyTime: 101,
-        totalSessions: 98,
-        documentsCreated: 18,
-        documentsEdited: 45,
-        practicesCompleted: 62,
-        practiceAccuracy: 85,
-        knowledgePointsMastered: 12,
-      },
-      weeklyTrend: [
-        { week: 1, studyTime: 720, activities: 24 },
-        { week: 2, studyTime: 780, activities: 26 },
-        { week: 3, studyTime: 810, activities: 25 },
-        { week: 4, studyTime: 810, activities: 23 },
-      ],
-      topActivities: [
-        { type: "编辑文档", duration: 1200, percentage: 38 },
-        { type: "练习题目", duration: 1050, percentage: 34 },
-        { type: "AI 对话", duration: 620, percentage: 20 },
-        { type: "创建文档", duration: 250, percentage: 8 },
-      ],
-      knowledgeMastery: [
-        { name: "React Hooks", mastery: 85, category: "前端开发" },
-        { name: "TypeScript", mastery: 78, category: "编程语言" },
-        { name: "算法设计", mastery: 65, category: "计算机科学" },
-        { name: "数据结构", mastery: 72, category: "计算机科学" },
-        { name: "Node.js", mastery: 80, category: "后端开发" },
-        { name: "CSS布局", mastery: 90, category: "前端开发" },
-      ],
-      milestones: [
-        "本月学习时长突破50小时",
-        "创建了 18 篇学习笔记",
-        "掌握了 12 个知识点",
-        "最长连续学习 21 天",
-      ],
-      achievements: ["月度学习达人", "练习题达人"],
-      insights: [
-        "本月学习时长表现优秀",
-        "学习习惯保持稳定",
-      ],
-      recommendations: [
-        "继续保持良好的学习节奏",
-        "可以尝试更深入的项目实践",
-        "建议定期复习已掌握的知识点",
-      ],
-    };
+    if (!ready || !userId) return;
+    let cancelled = false;
+    setLoading(true);
 
-    setTimeout(() => {
-      setReport(mockReport);
-      setLoading(false);
-    }, 500);
-  }, [date]);
+    (async () => {
+      try {
+        const qs = new URLSearchParams({
+          userId,
+          date: date.toISOString(),
+        });
+        const res = await fetch(`/api/analytics/monthly-report?${qs}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as MonthlyReportType;
+        if (!cancelled) setReport(data);
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) setReport(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [date, userId, ready]);
 
   if (loading || !report) {
-    return <div className="text-center py-8">加载中...</div>;
+    return <div className="text-center py-8">{loading ? "加载中..." : "暂无月报数据"}</div>;
   }
 
   const formatTime = (minutes: number) => {
@@ -111,7 +79,7 @@ export function MonthlyReport({ date }: MonthlyReportProps) {
     return hours > 0 ? `${hours}小时${mins}分钟` : `${mins}分钟`;
   };
 
-  const weeklyChartData = report.weeklyTrend.map((week) => ({
+  const weeklyChartData = (report.weeklyTrend || []).map((week) => ({
     week: `第${week.week}周`,
     学习时长: week.studyTime,
     活动次数: week.activities,

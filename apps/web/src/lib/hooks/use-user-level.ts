@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { getLocalUserId } from '@/lib/identity/local-user';
 
 interface UseUserLevelReturn {
   addExp: (eventType: string, metadata?: any) => Promise<{
@@ -13,9 +14,11 @@ interface UseUserLevelReturn {
   error: string | null;
 }
 
-export function useUserLevel(userId: string = 'demo_user'): UseUserLevelReturn {
+/** userId 省略时取当前本地用户 */
+export function useUserLevel(userId?: string): UseUserLevelReturn {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const resolvedUserId = userId || getLocalUserId();
 
   const addExp = useCallback(async (eventType: string, metadata?: any) => {
     setLoading(true);
@@ -28,7 +31,7 @@ export function useUserLevel(userId: string = 'demo_user'): UseUserLevelReturn {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          userId,
+          userId: resolvedUserId,
           eventType,
           metadata
         })
@@ -48,7 +51,7 @@ export function useUserLevel(userId: string = 'demo_user'): UseUserLevelReturn {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [resolvedUserId]);
 
   return {
     addExp,

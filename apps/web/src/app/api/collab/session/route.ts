@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const sessionId = searchParams.get("id");
-    const userId = searchParams.get("userId") || "demo_user";
+    const userId = searchParams.get("userId") || "local_default";
 
     const db = await loadDb();
 
@@ -70,8 +70,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const data = createSessionSchema.parse(body);
-    const userId = body.userId || "demo_user";
-    const userName = body.userName || "演示用户";
+    const userId = body.userId || "local_default";
+    const userName = body.userName || "本地学习者";
 
     const db = await loadDb();
     if (!db.collabSessions) {
@@ -131,7 +131,7 @@ export async function PATCH(req: NextRequest) {
 
     const body = await req.json();
     const data = updateSessionSchema.parse(body);
-    const userId = body.userId || "demo_user";
+    const userId = body.userId || "local_default";
 
     const db = await loadDb();
     const sessionIndex = db.collabSessions?.findIndex(
@@ -181,7 +181,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const sessionId = searchParams.get("id");
-    const userId = searchParams.get("userId") || "demo_user";
+    const userId = searchParams.get("userId") || "local_default";
 
     if (!sessionId) {
       return NextResponse.json({ error: "缺少会话ID" }, { status: 400 });

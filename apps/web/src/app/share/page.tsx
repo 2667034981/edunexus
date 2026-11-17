@@ -1,18 +1,12 @@
 import { redirect } from 'next/navigation';
 
-type ShareSearchParams = {
-  title?: string;
-  text?: string;
-  url?: string;
-};
-
 export default async function SharePage({
   searchParams,
 }: {
-  // Next.js 15+ 起 searchParams 为 Promise
-  searchParams: Promise<ShareSearchParams>;
+  searchParams: { title?: string; text?: string; url?: string };
 }) {
-  const { title, text, url } = await searchParams;
+  // Handle shared content
+  const { title, text, url } = searchParams;
 
   // Process shared content (save to database, etc.)
   console.log('Shared content:', { title, text, url });

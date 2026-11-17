@@ -14,6 +14,8 @@ import {
   QuestionDifficulty,
 } from "@/lib/client/practice-storage";
 import { QuestionRenderer } from "@/components/practice/question-renderer";
+import { recordLearningActivity } from "@/lib/client/learning-activity";
+import { getLocalUserId } from "@/lib/identity/local-user";
 
 function DrillPageContent() {
   const router = useRouter();
@@ -82,7 +84,24 @@ function DrillPageContent() {
       setCurrentIndex(currentIndex + 1);
       setStartTime(Date.now());
     } else {
+      const nextResults = { ...results, [currentQuestion.id]: isCorrect };
       setIsFinished(true);
+      const correctCount = Object.values(nextResults).filter(Boolean).length;
+      const totalTimeSec = Object.values({
+        ...timeSpent,
+        [currentQuestion.id]: spent,
+      }).reduce((sum, t) => sum + t, 0);
+      void recordLearningActivity({
+        userId: getLocalUserId(),
+        activityType: "practice",
+        durationMinutes: Math.max(1, Math.round(totalTimeSec / 60)),
+        metadata: {
+          practiceId: bankId || undefined,
+          questionsCount: questions.length,
+          correctCount,
+          completed: true,
+        },
+      });
     }
   };
 

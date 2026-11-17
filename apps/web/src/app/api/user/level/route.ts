@@ -9,7 +9,7 @@ import { getLevelByNumber } from '@/lib/server/level-config';
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId') || 'demo_user';
+    const userId = searchParams.get('userId') || 'local_default';
 
     const [level, experience, stats] = await Promise.all([
       getUserLevel(userId),

@@ -11,26 +11,27 @@ import { PostCard } from '@/components/community/post-card'
 import { getFeed } from '@/lib/community/feed-algorithm'
 import { getTopicByName, getHotTopics } from '@/lib/community/post-storage'
 import type { Post } from '@/lib/community/types'
-
-const CURRENT_USER_ID = 'demo_user'
+import { useLocalUser } from '@/lib/identity/user-provider'
 
 export default function TopicPage() {
   const params = useParams()
   const router = useRouter()
   const topicName = decodeURIComponent(params.name as string)
+  const { userId: CURRENT_USER_ID } = useLocalUser()
 
   const [posts, setPosts] = useState<Post[]>([])
   const topic = getTopicByName(topicName)
   const relatedTopics = getHotTopics(6).filter(t => t.name !== topicName)
 
   useEffect(() => {
+    if (!CURRENT_USER_ID) return
     const topicPosts = getFeed(CURRENT_USER_ID, {
       type: 'topic',
       topicName,
       sortBy: 'latest',
     }, 0, 50)
     setPosts(topicPosts)
-  }, [topicName])
+  }, [topicName, CURRENT_USER_ID])
 
   if (!topic) {
     return (

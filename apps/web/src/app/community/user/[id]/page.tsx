@@ -12,22 +12,23 @@ import { UserFollowButton } from '@/components/community/user-follow-button'
 import { getFeed } from '@/lib/community/feed-algorithm'
 import { getUserProfile, getFollowersList, getFollowingList } from '@/lib/community/follow-system'
 import type { Post, UserProfile } from '@/lib/community/types'
-
-const CURRENT_USER_ID = 'demo_user'
+import { useLocalUser } from '@/lib/identity/user-provider'
 
 export default function UserProfilePage() {
   const params = useParams()
   const router = useRouter()
   const userId = params.id as string
+  const { userId: CURRENT_USER_ID } = useLocalUser()
 
   const [activeTab, setActiveTab] = useState<'posts' | 'followers' | 'following'>('posts')
   const [posts, setPosts] = useState<Post[]>([])
   const [followers, setFollowers] = useState<UserProfile[]>([])
   const [following, setFollowing] = useState<UserProfile[]>([])
 
-  const userProfile = getUserProfile(userId, CURRENT_USER_ID)
+  const userProfile = getUserProfile(userId, CURRENT_USER_ID || 'local_default')
 
   useEffect(() => {
+    if (!CURRENT_USER_ID) return
     if (activeTab === 'posts') {
       const userPosts = getFeed(CURRENT_USER_ID, { userId }, 0, 50)
       setPosts(userPosts)
@@ -36,7 +37,7 @@ export default function UserProfilePage() {
     } else if (activeTab === 'following') {
       setFollowing(getFollowingList(userId, CURRENT_USER_ID))
     }
-  }, [activeTab, userId])
+  }, [activeTab, userId, CURRENT_USER_ID])
 
   return (
     <div className="container mx-auto py-8 px-4">

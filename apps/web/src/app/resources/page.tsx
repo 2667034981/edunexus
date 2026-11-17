@@ -22,8 +22,10 @@ import {
 } from "@/lib/resources/resource-recommender";
 import { generateSampleResources } from "@/lib/resources/sample-data";
 import type { Resource, ResourceType } from "@/lib/resources/resource-types";
+import { useLocalUser } from "@/lib/identity/user-provider";
 
 export default function ResourcesPage() {
+  const { userId, ready } = useLocalUser();
   const [showUpload, setShowUpload] = useState(false);
   const [resources, setResources] = useState<Resource[]>([]);
   const [filteredResources, setFilteredResources] = useState<Resource[]>([]);
@@ -33,9 +35,8 @@ export default function ResourcesPage() {
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
 
-  const userId = "demo_user";
-
   const loadResources = () => {
+    if (!userId) return;
     const allResources = getAllResources();
     setResources(allResources);
     setFilteredResources(allResources);
@@ -77,14 +78,16 @@ export default function ResourcesPage() {
   };
 
   useEffect(() => {
+    if (!ready || !userId) return;
     // 生成示例数据（仅首次）
     generateSampleResources();
     loadResources();
-  }, []);
+  }, [ready, userId]);
 
   useEffect(() => {
+    if (!userId) return;
     loadBookmarkedResources();
-  }, [selectedFolder]);
+  }, [selectedFolder, userId]);
 
   const handleSearch = (filters: {
     keyword?: string;

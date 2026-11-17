@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { createResource } from "@/lib/resources/resource-storage";
 import type { ResourceType } from "@/lib/resources/resource-types";
+import { getLocalUserId } from "@/lib/identity/local-user";
 
 interface ResourceUploadProps {
   open: boolean;
@@ -88,7 +89,7 @@ export function ResourceUpload({ open, onOpenChange, onSuccess }: ResourceUpload
         tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
         author: author || undefined,
         source: source || undefined,
-        userId: "demo_user",
+        userId: getLocalUserId(),
       });
 
       // 重置表单

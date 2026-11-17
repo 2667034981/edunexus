@@ -16,12 +16,12 @@ import { getHotTopics } from '@/lib/community/post-storage'
 import { getRecommendedUsers } from '@/lib/community/follow-system'
 import type { Post, FeedFilter } from '@/lib/community/types'
 import { useRouter } from 'next/navigation'
-
-const CURRENT_USER_ID = 'demo_user'
-const CURRENT_USER_NAME = '演示用户'
+import { useLocalUser } from '@/lib/identity/user-provider'
 
 export default function CommunityPage() {
   const router = useRouter()
+  const { userId: CURRENT_USER_ID, displayName, ready } = useLocalUser()
+  const CURRENT_USER_NAME = displayName || '本地学习者'
   const [activeTab, setActiveTab] = useState<'recommended' | 'following' | 'hot'>('recommended')
   const [posts, setPosts] = useState<Post[]>([])
   const [page, setPage] = useState(0)
@@ -31,6 +31,7 @@ export default function CommunityPage() {
   const loadMoreRef = useRef<HTMLDivElement>(null)
 
   const loadPosts = useCallback((pageNum: number, reset: boolean = false) => {
+    if (!CURRENT_USER_ID) return
     setIsLoading(true)
 
     let newPosts: Post[] = []
@@ -53,12 +54,13 @@ export default function CommunityPage() {
 
     setHasMore(newPosts.length === 10)
     setIsLoading(false)
-  }, [activeTab])
+  }, [activeTab, CURRENT_USER_ID])
 
   useEffect(() => {
+    if (!ready || !CURRENT_USER_ID) return
     setPage(0)
     loadPosts(0, true)
-  }, [activeTab, loadPosts])
+  }, [activeTab, loadPosts, ready, CURRENT_USER_ID])
 
   useEffect(() => {
     if (observerRef.current) {

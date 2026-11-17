@@ -1,0 +1,630 @@
+/**
+ * 学习路径本地存储模块
+ * 使用 IndexedDB 存储学习路径和任务数据
+ */
+
+import { openDB, DBSchema, IDBPDatabase } from 'idb';
+import { localStoragePathManager } from './path-storage-fallback';
+import { getDataSyncEventManager, SyncEventType } from '../sync/data-sync-events';
+import { goalStorage } from '../goals/goal-storage';
+
+// 数据类型定义
+export type PathStatus = 'not_started' | 'in_progress' | 'completed';
+export type TaskStatus = 'not_started' | 'in_progress' | 'completed';
+
+export type Resource = {
+  id: string;
+  title: string;
+  type: 'article' | 'video' | 'document';
+  url: string;
+};
+
+export type Task = {
+  id: string;
+  title: string;
+  description: string;
+  estimatedTime: string;
+  progress: number;
+  status: TaskStatus;
+  dependencies: string[];
+  resources: Resource[];
+  notes: string;
+  createdAt: Date;
+  startedAt?: Date;
+  completedAt?: Date;
+  actualTime?: number; // 实际学习时长（分钟）
+};
+
+export type Milestone = {
+  id: string;
+  title: string;
+  taskIds: string[];
+};
+
+export type LearningPath = {
+  id: string;
+  title: string;
+  description: string;
+  status: PathStatus;
+  progress: number;
+  tags: string[];
+  goalId?: string; // 关联的目标 ID
+  createdAt: Date;
+  updatedAt: Date;
+  tasks: Task[];
+  milestones: Milestone[];
+};
+
+type SeedPathInput = Omit<LearningPath, 'id' | 'createdAt' | 'updatedAt'> & {
+  id?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+};
+
+// IndexedDB Schema
+interface PathDB extends DBSchema {
+  paths: {
+    key: string;
+    value: LearningPath;
+    indexes: { 'by-status': PathStatus; 'by-updated': Date };
+  };
+}
+
+const DB_NAME = 'EduNexusPath';
+const DB_VERSION = 1;
+
+const toSafeCategory = (path: Pick<LearningPath, 'tags' | 'status'>): string => {
+  if (Array.isArray(path.tags) && path.tags.length > 0 && path.tags[0]) {
+    return path.tags[0];
+  }
+  return path.status;
+};
+
+const emitPathSyncEvent = (
+  type: SyncEventType.PATH_CREATED | SyncEventType.PATH_UPDATED,
+  path: LearningPath
+): void => {
+  const eventManager = getDataSyncEventManager();
+  eventManager.emit(
+    type,
+    {
+      id: path.id,
+      title: path.title,
+      description: path.description,
+      category: toSafeCategory(path),
+      progress: path.progress,
+      status: path.status,
+      taskCount: path.tasks.length,
+      tags: path.tags,
+      updatedAt: path.updatedAt.toISOString(),
+    },
+    'client-path-storage'
+  );
+};
+
+const emitPathDeletedEvent = (pathId: string): void => {
+  const eventManager = getDataSyncEventManager();
+  eventManager.emit(SyncEventType.PATH_DELETED, { id: pathId }, 'client-path-storage');
+};
+
+const emitPathProgressEvent = (path: LearningPath): void => {
+  const eventManager = getDataSyncEventManager();
+  const completedTaskIds = path.tasks.filter((task) => task.status === 'completed').map((task) => task.id);
+  eventManager.emit(
+    SyncEventType.PATH_PROGRESS_UPDATED,
+    {
+      pathId: path.id,
+      progress: path.progress,
+      completedNodes: completedTaskIds,
+      completedTasks: completedTaskIds.length,
+      totalTasks: path.tasks.length,
+      status: path.status,
+    },
+    'client-path-storage'
+  );
+};
+
+const syncPathToServerGraph = async (path: LearningPath): Promise<void> => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    await fetch('/api/path/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pathId: path.id,
+        title: path.title,
+        description: path.description,
+        status: path.status,
+        progress: path.progress,
+        tags: path.tags,
+        tasks: path.tasks.map((task) => ({
+          taskId: task.id,
+          title: task.title,
+          description: task.description,
+          estimatedTime: task.estimatedTime,
+          status: task.status,
+          progress: task.progress,
+          dependencies: task.dependencies,
+        })),
+      }),
+    });
+  } catch (error) {
+    console.warn('[PathStorage] 服务端路径图谱同步失败:', error);
+  }
+};
+
+const deletePathFromServerGraph = async (pathId: string): Promise<void> => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    await fetch(`/api/path/sync?pathId=${encodeURIComponent(pathId)}`, {
+      method: 'DELETE',
+    });
+  } catch (error) {
+    console.warn('[PathStorage] 服务端路径图谱删除失败:', error);
+  }
+};
+
+/**
+ * 学习路径存储管理类
+ */
+export class PathStorageManager {
+  private db: IDBPDatabase<PathDB> | null = null;
+  private useLocalStorage = false; // 是否使用 LocalStorage 备用方案
+
+  /**
+   * 初始化数据库
+   */
+  async initialize(): Promise<void> {
+    if (this.db) return;
+    if (this.useLocalStorage) return; // 已经在使用 LocalStorage
+
+    try {
+      console.log('[PathStorage] 初始化数据库...');
+      this.db = await openDB<PathDB>(DB_NAME, DB_VERSION, {
+        upgrade(db) {
+          // 创建路径存储
+          if (!db.objectStoreNames.contains('paths')) {
+            console.log('[PathStorage] 创建 paths 对象存储');
+            const pathStore = db.createObjectStore('paths', { keyPath: 'id' });
+            pathStore.createIndex('by-status', 'status');
+            pathStore.createIndex('by-updated', 'updatedAt');
+          }
+        },
+      });
+
+      await this.hydrateFromLocalStorage();
+      console.log('[PathStorage] 数据库初始化成功');
+    } catch (error) {
+      console.error('[PathStorage] 数据库初始化失败，切换到 LocalStorage:', error);
+      this.useLocalStorage = true;
+      this.db = null;
+    }
+  }
+
+  private async hydrateFromLocalStorage(): Promise<void> {
+    if (!this.db) {
+      return;
+    }
+
+    try {
+      const existing = await this.db.getAll('paths');
+      if (existing.length > 0) {
+        return;
+      }
+
+      const fallbackPaths = localStoragePathManager.getAllPaths();
+      if (fallbackPaths.length === 0) {
+        return;
+      }
+
+      await Promise.all(
+        fallbackPaths.map((path) => this.db!.put('paths', this.serializePath(path)))
+      );
+      console.log('[PathStorage] 已从 LocalStorage 迁移路径:', fallbackPaths.length, '个');
+    } catch (error) {
+      console.error('[PathStorage] 从 LocalStorage 迁移失败:', error);
+    }
+  }
+
+  /**
+   * 获取所有学习路径
+   */
+  async getAllPaths(): Promise<LearningPath[]> {
+    try {
+      await this.initialize();
+
+      // 使用 LocalStorage 备用方案
+      if (this.useLocalStorage) {
+        console.log('[PathStorage] 使用 LocalStorage 获取路径');
+        return localStoragePathManager.getAllPaths();
+      }
+
+      const paths = await this.db!.getAll('paths');
+      console.log('[PathStorage] 获取所有路径:', paths.length, '个');
+      return paths.map(this.deserializePath);
+    } catch (error) {
+      console.error('[PathStorage] 获取路径失败，尝试 LocalStorage:', error);
+      this.useLocalStorage = true;
+      return localStoragePathManager.getAllPaths();
+    }
+  }
+
+  /**
+   * 按给定 ID 保存路径（用于兼容旧路径模型桥接）
+   */
+  async savePath(path: LearningPath): Promise<LearningPath> {
+    try {
+      await this.initialize();
+
+      if (this.useLocalStorage) {
+        const existed = Boolean(localStoragePathManager.getPath(path.id));
+        const saved = localStoragePathManager.savePath(path);
+        emitPathSyncEvent(existed ? SyncEventType.PATH_UPDATED : SyncEventType.PATH_CREATED, saved);
+        emitPathProgressEvent(saved);
+        void syncPathToServerGraph(saved);
+        return saved;
+      }
+
+      const existing = await this.getPath(path.id);
+      const nextPath: LearningPath = {
+        ...path,
+        createdAt: path.createdAt,
+        updatedAt: path.updatedAt,
+      };
+
+      await this.db!.put('paths', this.serializePath(nextPath));
+      emitPathSyncEvent(existing ? SyncEventType.PATH_UPDATED : SyncEventType.PATH_CREATED, nextPath);
+      emitPathProgressEvent(nextPath);
+      void syncPathToServerGraph(nextPath);
+      return nextPath;
+    } catch (error) {
+      console.error('[PathStorage] savePath 失败，尝试 LocalStorage:', error);
+      this.useLocalStorage = true;
+      const existed = Boolean(localStoragePathManager.getPath(path.id));
+      const saved = localStoragePathManager.savePath(path);
+      emitPathSyncEvent(existed ? SyncEventType.PATH_UPDATED : SyncEventType.PATH_CREATED, saved);
+      emitPathProgressEvent(saved);
+      void syncPathToServerGraph(saved);
+      return saved;
+    }
+  }
+
+  /**
+   * 创建新路径
+   */
+  async createPath(data: Omit<LearningPath, 'id' | 'createdAt' | 'updatedAt'>): Promise<LearningPath> {
+    try {
+      await this.initialize();
+
+      // 使用 LocalStorage 备用方案
+      if (this.useLocalStorage) {
+        console.log('[PathStorage] 使用 LocalStorage 创建路径');
+        const created = localStoragePathManager.createPath(data);
+        if (created.goalId) {
+          goalStorage.linkPath(created.goalId, created.id);
+        }
+        emitPathSyncEvent(SyncEventType.PATH_CREATED, created);
+        emitPathProgressEvent(created);
+        void syncPathToServerGraph(created);
+        return created;
+      }
+
+      const path: LearningPath = {
+        ...data,
+        id: `path_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      console.log('[PathStorage] 创建路径:', path.id, path.title);
+      const serialized = this.serializePath(path);
+      await this.db!.put('paths', serialized);
+      console.log('[PathStorage] 路径已保存到 IndexedDB');
+
+      // 验证保存
+      const saved = await this.db!.get('paths', path.id);
+      if (!saved) {
+        throw new Error('路径保存后无法读取');
+      }
+      console.log('[PathStorage] 验证成功，路径已保存');
+
+      if (path.goalId) {
+        goalStorage.linkPath(path.goalId, path.id);
+      }
+      emitPathSyncEvent(SyncEventType.PATH_CREATED, path);
+      emitPathProgressEvent(path);
+      void syncPathToServerGraph(path);
+      return path;
+    } catch (error) {
+      console.error('[PathStorage] 创建路径失败，尝试 LocalStorage:', error);
+      this.useLocalStorage = true;
+      const created = localStoragePathManager.createPath(data);
+      if (created.goalId) {
+        goalStorage.linkPath(created.goalId, created.id);
+      }
+      emitPathSyncEvent(SyncEventType.PATH_CREATED, created);
+      emitPathProgressEvent(created);
+      void syncPathToServerGraph(created);
+      return created;
+    }
+  }
+
+  async seedPath(data: SeedPathInput): Promise<LearningPath> {
+    await this.initialize();
+
+    const path: LearningPath = {
+      ...data,
+      id: data.id ?? `path_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      createdAt: data.createdAt ?? new Date(),
+      updatedAt: data.updatedAt ?? new Date(),
+    };
+
+    if (this.useLocalStorage) {
+      return localStoragePathManager.savePath(path);
+    }
+
+    await this.db!.put('paths', this.serializePath(path));
+    return path;
+  }
+
+  /**
+   * 根据 ID 获取路径
+   */
+  async getPath(id: string): Promise<LearningPath | undefined> {
+    await this.initialize();
+
+    // 使用 LocalStorage 备用方案
+    if (this.useLocalStorage) {
+      return localStoragePathManager.getPath(id);
+    }
+
+    const path = await this.db!.get('paths', id);
+    return path ? this.deserializePath(path) : undefined;
+  }
+
+  /**
+   * 更新路径
+   */
+  async updatePath(id: string, updates: Partial<LearningPath>): Promise<LearningPath> {
+    try {
+      await this.initialize();
+
+      const existing = await this.getPath(id);
+      if (!existing) {
+        throw new Error(`Path ${id} not found`);
+      }
+
+      const previousGoalId = existing.goalId;
+      const hasGoalIdUpdate = Object.prototype.hasOwnProperty.call(updates, 'goalId');
+      const nextGoalId = hasGoalIdUpdate ? updates.goalId : existing.goalId;
+      const updated: LearningPath = {
+        ...existing,
+        ...updates,
+        goalId: nextGoalId,
+        id: existing.id,
+        createdAt: existing.createdAt,
+        updatedAt: new Date(),
+      };
+
+      // 自动计算进度
+      if (updated.tasks.length > 0) {
+        const totalProgress = updated.tasks.reduce((sum, task) => sum + task.progress, 0);
+        updated.progress = Math.round(totalProgress / updated.tasks.length);
+      }
+
+      // 自动更新状态
+      if (updated.progress === 0) {
+        updated.status = 'not_started';
+      } else if (updated.progress === 100) {
+        updated.status = 'completed';
+      } else {
+        updated.status = 'in_progress';
+      }
+
+      console.log('[PathStorage] 更新路径:', id, '进度:', updated.progress);
+
+      if (previousGoalId && previousGoalId !== nextGoalId) {
+        goalStorage.unlinkPath(id);
+      }
+      if (nextGoalId && previousGoalId !== nextGoalId) {
+        goalStorage.linkPath(nextGoalId, id);
+      }
+
+      if (this.useLocalStorage) {
+        const saved = localStoragePathManager.updatePath(id, updated);
+        console.log('[PathStorage] LocalStorage 路径已更新');
+        emitPathSyncEvent(SyncEventType.PATH_UPDATED, saved);
+        emitPathProgressEvent(saved);
+        void syncPathToServerGraph(saved);
+        return saved;
+      }
+
+      await this.db!.put('paths', this.serializePath(updated));
+      console.log('[PathStorage] 路径已更新');
+
+      emitPathSyncEvent(SyncEventType.PATH_UPDATED, updated);
+      emitPathProgressEvent(updated);
+      void syncPathToServerGraph(updated);
+      return updated;
+    } catch (error) {
+      console.error('[PathStorage] 更新路径失败:', error);
+      throw error;
+    }
+  }
+
+  async unlinkGoal(goalId: string): Promise<void> {
+    await this.initialize();
+
+    const paths = await this.getAllPaths();
+    const linkedPaths = paths.filter((path) => path.goalId === goalId);
+
+    for (const path of linkedPaths) {
+      await this.updatePath(path.id, { goalId: undefined });
+    }
+  }
+
+  /**
+   * 删除路径
+   */
+  async deletePath(id: string): Promise<void> {
+    await this.initialize();
+    goalStorage.unlinkPath(id);
+
+    if (this.useLocalStorage) {
+      localStoragePathManager.deletePath(id);
+      emitPathDeletedEvent(id);
+      void deletePathFromServerGraph(id);
+      return;
+    }
+
+    await this.db!.delete('paths', id);
+    emitPathDeletedEvent(id);
+    void deletePathFromServerGraph(id);
+  }
+
+  /**
+   * 复制路径
+   */
+  async duplicatePath(id: string): Promise<LearningPath> {
+    await this.initialize();
+
+    const original = await this.getPath(id);
+    if (!original) {
+      throw new Error(`Path ${id} not found`);
+    }
+
+    const duplicate: LearningPath = {
+      ...original,
+      id: `path_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      title: `${original.title} (副本)`,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      status: 'not_started',
+      progress: 0,
+      tasks: original.tasks.map(task => ({
+        ...task,
+        id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        status: 'not_started',
+        progress: 0,
+        startedAt: undefined,
+        completedAt: undefined,
+        actualTime: undefined,
+      })),
+      milestones: original.milestones.map(milestone => ({
+        ...milestone,
+        id: `milestone_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      })),
+    };
+
+    if (this.useLocalStorage) {
+      const saved = localStoragePathManager.savePath(duplicate);
+      if (saved.goalId) {
+        goalStorage.linkPath(saved.goalId, saved.id);
+      }
+      emitPathSyncEvent(SyncEventType.PATH_CREATED, saved);
+      emitPathProgressEvent(saved);
+      void syncPathToServerGraph(saved);
+      return saved;
+    }
+
+    await this.db!.put('paths', this.serializePath(duplicate));
+    if (duplicate.goalId) {
+      goalStorage.linkPath(duplicate.goalId, duplicate.id);
+    }
+    emitPathSyncEvent(SyncEventType.PATH_CREATED, duplicate);
+    emitPathProgressEvent(duplicate);
+    void syncPathToServerGraph(duplicate);
+    return duplicate;
+  }
+
+  /**
+   * 导出路径数据
+   */
+  async exportPath(id: string): Promise<string> {
+    const path = await this.getPath(id);
+    if (!path) {
+      throw new Error(`Path ${id} not found`);
+    }
+    return JSON.stringify(path, null, 2);
+  }
+
+  /**
+   * 导入路径数据
+   */
+  async importPath(jsonData: string): Promise<LearningPath> {
+    const data = JSON.parse(jsonData);
+
+    // 生成新 ID
+    const path: LearningPath = {
+      ...data,
+      id: `path_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await this.initialize();
+
+    if (this.useLocalStorage) {
+      const saved = localStoragePathManager.savePath(path);
+      if (saved.goalId) {
+        goalStorage.linkPath(saved.goalId, saved.id);
+      }
+      emitPathSyncEvent(SyncEventType.PATH_CREATED, saved);
+      emitPathProgressEvent(saved);
+      void syncPathToServerGraph(saved);
+      return saved;
+    }
+
+    await this.db!.put('paths', this.serializePath(path));
+    if (path.goalId) {
+      goalStorage.linkPath(path.goalId, path.id);
+    }
+    emitPathSyncEvent(SyncEventType.PATH_CREATED, path);
+    emitPathProgressEvent(path);
+    void syncPathToServerGraph(path);
+    return path;
+  }
+
+  /**
+   * 序列化路径（将 Date 转为 string）
+   */
+  private serializePath(path: LearningPath): any {
+    return {
+      ...path,
+      createdAt: path.createdAt.toISOString(),
+      updatedAt: path.updatedAt.toISOString(),
+      tasks: path.tasks.map(task => ({
+        ...task,
+        createdAt: task.createdAt.toISOString(),
+        startedAt: task.startedAt?.toISOString(),
+        completedAt: task.completedAt?.toISOString(),
+      })),
+    };
+  }
+
+  /**
+   * 反序列化路径（将 string 转为 Date）
+   */
+  private deserializePath(data: any): LearningPath {
+    return {
+      ...data,
+      createdAt: new Date(data.createdAt),
+      updatedAt: new Date(data.updatedAt),
+      tasks: data.tasks.map((task: any) => ({
+        ...task,
+        createdAt: new Date(task.createdAt),
+        startedAt: task.startedAt ? new Date(task.startedAt) : undefined,
+        completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
+      })),
+    };
+  }
+}
+
+// 单例实例
+export const pathStorage = new PathStorageManager();
