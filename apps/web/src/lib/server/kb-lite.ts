@@ -151,6 +151,28 @@ function getRootCandidates() {
   ];
 }
 
+let writableVaultDir: string | null = null;
+
+/**
+ * 无服务器环境（Vercel）的磁盘只读，把随包分发的 vault 复制到 /tmp，
+ * 让「笔记入库 / 建索引」这类写操作在演示环境里也能真正落盘。
+ */
+function ensureWritableVault(seedDir: string): string {
+  if (writableVaultDir) {
+    return writableVaultDir;
+  }
+  const target = path.join("/tmp", "edunexus-vault");
+  try {
+    if (!fsSync.existsSync(target)) {
+      fsSync.cpSync(seedDir, target, { recursive: true });
+    }
+    writableVaultDir = target;
+    return target;
+  } catch {
+    return seedDir;
+  }
+}
+
 export function resolveVaultDir() {
   if (process.env.EDUNEXUS_VAULT_DIR) {
     return process.env.EDUNEXUS_VAULT_DIR;
@@ -161,6 +183,9 @@ export function resolveVaultDir() {
     try {
       const stat = fsSync.statSync(candidate);
       if (stat.isDirectory()) {
+        if (process.env.VERCEL) {
+          return ensureWritableVault(candidate);
+        }
         return candidate;
       }
     } catch {
