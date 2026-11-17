@@ -10,6 +10,10 @@ import { getModelscopeClient } from "@/lib/server/modelscope";
 import { searchVault, getVaultDocById } from "@/lib/server/kb-lite";
 import { getGraphView } from "@/lib/server/graph-service";
 import { getSyncedPath, listSyncedPaths } from "@/lib/server/path-sync-service";
+import {
+  generatePathRecommendations,
+  rankSyncedPathsAsRecommendations,
+} from "@/lib/path/path-recommend";
 
 /**
  * 搜索知识库工具（真实实现）
@@ -252,7 +256,7 @@ export const generateExerciseTool = new DynamicStructuredTool({
 });
 
 /**
- * 推荐学习路径工具（使用 AI 生成）
+ * 推荐学习路径工具：本地已同步路径 + 规则推荐 +（可选）AI 细化
  */
 export const recommendLearningPathTool = new DynamicStructuredTool({
   name: "recommend_learning_path",
@@ -264,38 +268,57 @@ export const recommendLearningPathTool = new DynamicStructuredTool({
   }),
   func: async ({ currentTopic, goal, userLevel = "intermediate" }) => {
     try {
-      const client = getModelscopeClient();
-
-      const prompt = `用户当前正在学习"${currentTopic}"，水平是${userLevel === "beginner" ? "初学者" : userLevel === "intermediate" ? "中级" : "高级"}。
-${goal ? `学习目标：${goal}` : ""}
-
-请为用户规划一个详细的学习路径，包括：
-1. 需要补充的前置知识（如果有）
-2. 当前主题的学习步骤（3-5个阶段）
-3. 每个阶段的时间建议
-4. 推荐的学习资源
-5. 实践项目建议
-
-请以 JSON 格式返回。`;
-
-      const completion = await client.chat.completions.create({
-        model: process.env.MODELSCOPE_CHAT_MODEL || "Qwen/Qwen3-8B",
-        messages: [
-          { role: "system", content: "你是一个专业的学习规划师。" },
-          { role: "user", content: prompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 1500,
+      const effectiveGoal = (goal || currentTopic || "").trim();
+      const synced = await listSyncedPaths();
+      const fromSynced = rankSyncedPathsAsRecommendations(
+        synced.map((p) => ({
+          pathId: p.pathId,
+          title: p.title,
+          description: p.description,
+          progress: p.progress,
+          tags: p.tags,
+          status: p.status,
+        })),
+        currentTopic
+      );
+      const fromRules = generatePathRecommendations({
+        goal: effectiveGoal,
+        currentLevel: userLevel,
+        interests: [currentTopic],
       });
 
-      const response = completion.choices[0]?.message?.content || "";
+      let aiPath: string | null = null;
+      try {
+        const client = getModelscopeClient();
+        const prompt = `用户当前正在学习"${currentTopic}"，水平是${userLevel === "beginner" ? "初学者" : userLevel === "intermediate" ? "中级" : "高级"}。
+${goal ? `学习目标：${goal}` : ""}
 
-      return JSON.stringify({
-        currentTopic,
-        goal,
-        userLevel,
-        path: response,
-      }, null, 2);
+请为用户规划一个简洁学习路径（3-5 步），用 JSON 返回 steps 数组。`;
+        const completion = await client.chat.completions.create({
+          model: process.env.MODELSCOPE_CHAT_MODEL || "Qwen/Qwen3-8B",
+          messages: [
+            { role: "system", content: "你是一个专业的学习规划师。" },
+            { role: "user", content: prompt },
+          ],
+          temperature: 0.7,
+          max_tokens: 1200,
+        });
+        aiPath = completion.choices[0]?.message?.content || null;
+      } catch {
+        // AI 不可用时仍返回本地推荐
+      }
+
+      return JSON.stringify(
+        {
+          currentTopic,
+          goal: effectiveGoal,
+          userLevel,
+          recommendations: [...fromSynced, ...fromRules].slice(0, 8),
+          aiPlan: aiPath,
+        },
+        null,
+        2
+      );
     } catch (error) {
       return JSON.stringify({
         error: "生成学习路径失败",
